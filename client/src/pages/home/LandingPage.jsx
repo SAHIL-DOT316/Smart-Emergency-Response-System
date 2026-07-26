@@ -1,18 +1,46 @@
+import { Box, Typography, Button, Container } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../../components/common/Navbar";
+
 function LandingPage() {
+  const navigate = useNavigate();
+
   return (
-    <div>
-      <h1>🚑 Smart Emergency Response System</h1>
+    <>
+      <Navbar />
 
-      <p>Fast Emergency Response Saves Lives</p>
+      <Container sx={{ mt: 8 }}>
+        <Typography variant="h2" fontWeight="bold">
+          Smart Emergency Response System
+        </Typography>
 
-      <button>Request Ambulance</button>
+        <Typography
+          variant="h5"
+          sx={{ mt: 3 }}
+        >
+          Fast Emergency Response Saves Lives
+        </Typography>
 
-      <button>Driver Login</button>
+        <Typography
+          sx={{ mt: 3, maxWidth: 600 }}
+        >
+          Book the nearest ambulance,
+          track it in real time,
+          choose the hospital,
+          and activate Green Corridor simulation.
+        </Typography>
 
-      <button>Hospital Login</button>
-
-      <button>Admin Login</button>
-    </div>
+        <Box sx={{ mt: 5 }}>
+          <Button
+            variant="contained"
+            size="large"
+            onClick={() => navigate("/login")}
+          >
+            Request Ambulance
+          </Button>
+        </Box>
+      </Container>
+    </>
   );
 }
 
