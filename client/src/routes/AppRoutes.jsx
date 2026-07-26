@@ -7,11 +7,12 @@ import PatientDashboard from "../pages/patient/PatientDashboard";
 import DriverDashboard from "../pages/driver/DriverDashboard";
 import HospitalDashboard from "../pages/hospital/HospitalDashboard";
 import AdminDashboard from "../pages/admin/AdminDashboard";
-
+import LandingPage from "../pages/home/LandingPage";
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
+     <Route path="/" element={<LandingPage />} />
+     <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
       <Route path="/patient" element={<PatientDashboard />} />
