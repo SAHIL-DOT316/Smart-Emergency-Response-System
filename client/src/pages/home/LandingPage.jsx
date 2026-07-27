@@ -1,45 +1,26 @@
-import { Box, Typography, Button, Container } from "@mui/material";
-import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/common/Navbar";
-
+import HeroSection from "../../components/home/HeroSection";
+import StatsSection from "../../components/home/StatsSection";
+import ServicesSection from "../../components/home/ServicesSection";
+import HowItWorks from "../../components/home/HowItWorks";
+import FeaturesSection from "../../components/home/FeaturesSection";
+import GreenCorridorSection from "../../components/home/GreenCorridorSection";
+import FAQSection from "../../components/home/FAQSection";
+import ContactSection from "../../components/home/ContactSection";
+import Footer from "../../components/home/Footer";
 function LandingPage() {
-  const navigate = useNavigate();
-
   return (
     <>
       <Navbar />
-
-      <Container sx={{ mt: 8 }}>
-        <Typography variant="h2" fontWeight="bold">
-          Smart Emergency Response System
-        </Typography>
-
-        <Typography
-          variant="h5"
-          sx={{ mt: 3 }}
-        >
-          Fast Emergency Response Saves Lives
-        </Typography>
-
-        <Typography
-          sx={{ mt: 3, maxWidth: 600 }}
-        >
-          Book the nearest ambulance,
-          track it in real time,
-          choose the hospital,
-          and activate Green Corridor simulation.
-        </Typography>
-
-        <Box sx={{ mt: 5 }}>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={() => navigate("/login")}
-          >
-            Request Ambulance
-          </Button>
-        </Box>
-      </Container>
+      <HeroSection />
+      <StatsSection />
+      <ServicesSection />
+      <HowItWorks />
+      <FeaturesSection />
+      <GreenCorridorSection />
+      <FAQSection />
+      <ContactSection />
+      <Footer />
     </>
   );
 }
