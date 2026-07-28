@@ -37,7 +37,7 @@ const handleSubmit = (e) => {
 
       <form onSubmit={handleSubmit}>
 
-        <div className="mb-3">
+        
           <TextInput
             label="Full Name"
             name="fullName"
@@ -46,9 +46,9 @@ const handleSubmit = (e) => {
              placeholder="Enter your full name"
         />
 
-        </div>
+        
 
-        <div className="mb-3">
+        
           <TextInput
              label="Phone Number"
              name="phone"
@@ -57,9 +57,9 @@ const handleSubmit = (e) => {
              placeholder="Enter phone number"
          />
 
-        </div>
+        
 
-        <div className="mb-3">
+       
          <TextInput
               label="Email"
               type="email"
@@ -68,9 +68,9 @@ const handleSubmit = (e) => {
               onChange={handleChange}
               placeholder="Enter your email"
         />
-        </div>
+       
 
-        <div className="mb-3">
+  
            <PasswordInput
                  label="Password"
                 name="password"
@@ -78,9 +78,9 @@ const handleSubmit = (e) => {
               onChange={handleChange}
                 placeholder="Create password"
           />
-        </div>
+       
 
-        <div className="mb-4">
+        
         <PasswordInput
            label="Confirm Password"
             name="confirmPassword"
@@ -88,7 +88,7 @@ const handleSubmit = (e) => {
             onChange={handleChange}
            placeholder="Confirm password"
         />
-        </div>
+       
 
         <button
         type="submit"

@@ -30,7 +30,7 @@ const handleSubmit = (e) => {
 
      <form onSubmit={handleSubmit}>
 
-        <div className="mb-3">
+       
           <TextInput
            label="Email"
             type="email"
@@ -39,9 +39,9 @@ const handleSubmit = (e) => {
             onChange={handleChange}
             placeholder="Enter your email" 
 />
-        </div>
+  
 
-        <div className="mb-3">
+        
           <PasswordInput
           label="Password"
           name="password"
@@ -49,7 +49,7 @@ const handleSubmit = (e) => {
             onChange={handleChange}
            placeholder="Enter your password"
 />
-        </div>
+        
 
         <div className="d-flex justify-content-between align-items-center mb-4">
 
