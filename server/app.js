@@ -1,0 +1,29 @@
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import authRoutes from "./routes/authRoutes.js";
+import authMiddleware from "./middleware/authMiddleware.js";
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use(cookieParser());
+
+app.get("/api/patient/profile", authMiddleware, (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Protected Route Accessed",
+    user: req.user,
+  });
+});
+app.use("/api/auth", authRoutes);
+
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Smart Emergency Backend Running",
+  });
+});
+
+export default app;
