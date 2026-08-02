@@ -1,26 +1,35 @@
 function TextInput({
   label,
   type = "text",
-  placeholder,
   name,
   value,
   onChange,
+  placeholder,
+  error,
 }) {
   return (
-    <div className="mb-3">
+    <>
       <label className="form-label fw-semibold">
         {label}
       </label>
 
       <input
         type={type}
-        className="form-control form-control-lg"
-        placeholder={placeholder}
         name={name}
         value={value}
         onChange={onChange}
+        placeholder={placeholder}
+        className={`form-control ${
+          error ? "is-invalid" : ""
+        }`}
       />
-    </div>
+
+      {error && (
+        <div className="invalid-feedback">
+          {error}
+        </div>
+      )}
+    </>
   );
 }
 

@@ -1,7 +1,10 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+
 import authRoutes from "./routes/authRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+
 import authMiddleware from "./middleware/authMiddleware.js";
 
 const app = express();
@@ -18,6 +21,7 @@ app.get("/api/patient/profile", authMiddleware, (req, res) => {
   });
 });
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => {
   res.json({

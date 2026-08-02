@@ -1,24 +1,89 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+
 import AuthLayout from "../../components/auth/AuthLayout";
 import PasswordInput from "../../components/auth/PasswordInput";
 import TextInput from "../../components/auth/TextInput";
+import SubmitButton from "../../components/common/SubmitButton";
+
+import { loginPatient, loginAdmin } from "../../services/authService";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { toast } from "react-toastify";
+
 
 function Login() {
+   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
   email: "",
   password: "",
 });
+
+const [loading, setLoading] = useState(false);
+const [errors, setErrors] = useState({});
+const [role, setRole] = useState("patient");
 const handleChange = (e) => {
   setFormData({
-    ...formData,
-    [e.target.name]: e.target.value,
-  });
-};
-const handleSubmit = (e) => {
-  e.preventDefault();
+  ...formData,
+  [e.target.name]: e.target.value,
+});
 
-  console.log(formData);
+setErrors({
+  ...errors,
+  [e.target.name]: "",
+});
+};
+const validateForm = () => {
+  const newErrors = {};
+
+  if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    newErrors.email = "Please enter a valid email.";
+  }
+
+  if (formData.password.length < 6) {
+    newErrors.password = "Password must be at least 6 characters.";
+  }
+
+ 
+
+  setErrors(newErrors);
+
+  return Object.keys(newErrors).length === 0;
+};
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!validateForm()) {
+  return;
+}
+ setLoading(true);
+  try {
+  let response;
+
+if (role === "patient") {
+  response = await loginPatient(formData);
+} else {
+  response = await loginAdmin(formData);
+}
+
+ login(
+  response.token,
+  response.patient || response.admin
+);
+
+  console.log("Login Success:", response);
+  toast.success("Login Successful");
+  if (role === "patient") {
+  navigate("/patient");
+} else {
+  navigate("/admin");
+}
+} catch (error) {
+  console.log(error.response?.data);
+  toast.error(error.response?.data?.message || "Login Failed");
+}finally {
+    setLoading(false);
+  }
 };
   return (
     <AuthLayout>
@@ -29,26 +94,40 @@ const handleSubmit = (e) => {
       </p>
 
      <form onSubmit={handleSubmit}>
+<div className="mb-3">
+  <label className="form-label fw-semibold">
+    Login As
+  </label>
 
+  <select
+    className="form-select"
+    value={role}
+    onChange={(e) => setRole(e.target.value)}
+  >
+    <option value="patient">Patient</option>
+    <option value="admin">Admin</option>
+  </select>
+</div>
        
-          <TextInput
-           label="Email"
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            placeholder="Enter your email" 
+         <TextInput
+  label="Email"
+  type="email"
+  name="email"
+  value={formData.email}
+  onChange={handleChange}
+  placeholder="Enter your email"
+  error={errors.email}
 />
-  
 
-        
-          <PasswordInput
-          label="Password"
-          name="password"
-           value={formData.password}
-            onChange={handleChange}
-           placeholder="Enter your password"
+<PasswordInput
+  label="Password"
+  name="password"
+  value={formData.password}
+  onChange={handleChange}
+  placeholder="Enter your password"
+  error={errors.password}
 />
+
         
 
         <div className="d-flex justify-content-between align-items-center mb-4">
@@ -77,13 +156,11 @@ const handleSubmit = (e) => {
 
         </div>
 
-       <button
-  type="submit"
-  className="btn btn-primary btn-lg w-100"
->
-  Login
-</button>
-
+  <SubmitButton
+  loading={loading}
+  text="Login"
+  loadingText="Logging in..."
+/>
       </form>
 
       <hr className="my-4" />

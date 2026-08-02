@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import AuthLayout from "../../components/auth/AuthLayout";
 import TextInput from "../../components/auth/TextInput";
-
+import SubmitButton from "../../components/common/SubmitButton";
 function ForgotPassword() {
   const [email, setEmail] = useState("");
   const handleSubmit = (e) => {
