@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import TextInput from "../auth/TextInput";
 import PasswordInput from "../auth/PasswordInput";
 import SubmitButton from "../common/SubmitButton";
 
 
 import { toast } from "react-toastify";
-import { addDriver } from "../../services/driverService";
+import { addDriver,  updateDriver, } from "../../services/driverService";
 
-function AddDriverModal({ show, onClose, onSuccess }) {
+function AddDriverModal({ show, onClose, onSuccess, editDriver, }) {
   if (!show) return null;
   const [formData, setFormData] = useState({
   fullName: "",
@@ -20,19 +20,51 @@ function AddDriverModal({ show, onClose, onSuccess }) {
 
 const [loading, setLoading] = useState(false);
 
+useEffect(() => {
+  if (editDriver) {
+    setFormData({
+      fullName: editDriver.fullName || "",
+      phone: editDriver.phone || "",
+      email: editDriver.email || "",
+      password: "",
+      ambulanceNumber: editDriver.ambulanceNumber || "",
+      licenseNumber: editDriver.licenseNumber || "",
+    });
+  } else {
+    setFormData({
+      fullName: "",
+      phone: "",
+      email: "",
+      password: "",
+      ambulanceNumber: "",
+      licenseNumber: "",
+    });
+  }
+}, [editDriver]);
+
 const handleChange = (e) => {
   setFormData({
     ...formData,
     [e.target.name]: e.target.value,
   });
 };
-const handleSubmit = async (e) => {
+   const handleSubmit = async (e) => {
   e.preventDefault();
 
   setLoading(true);
 
   try {
-    const response = await addDriver(formData);
+
+    let response;
+
+    if (editDriver) {
+      response = await updateDriver(
+        editDriver._id,
+        formData
+      );
+    } else {
+      response = await addDriver(formData);
+    }
 
     toast.success(response.message);
 
@@ -53,7 +85,8 @@ const handleSubmit = async (e) => {
 
   } catch (error) {
     toast.error(
-      error.response?.data?.message || "Failed to add driver"
+      error.response?.data?.message ||
+      "Operation Failed"
     );
   } finally {
     setLoading(false);
@@ -68,7 +101,7 @@ const handleSubmit = async (e) => {
         <div className="modal-content">
 
           <div className="modal-header">
-            <h4>Add Driver</h4>
+            <h4> {editDriver ? "Edit Driver" : "Add Driver"}</h4>
 
             <button
               className="btn-close"
@@ -146,11 +179,15 @@ const handleSubmit = async (e) => {
   </div>
 
   <div className="mt-4">
-    <SubmitButton
-      loading={loading}
-      text="Add Driver"
-      loadingText="Adding Driver..."
-    />
+   <SubmitButton
+  loading={loading}
+  text={editDriver ? "Update Driver" : "Add Driver"}
+  loadingText={
+    editDriver
+      ? "Updating..."
+      : "Adding Driver..."
+  }
+/>
   </div>
 
 </form>
