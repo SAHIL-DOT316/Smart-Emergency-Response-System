@@ -6,6 +6,7 @@ import {
   getAllEmergencyRequests,
   assignDriver,
   getDriverRequests,
+  updateEmergencyStatus,
 } from "../controllers/emergencyController.js";
 
 const router = express.Router();
@@ -22,6 +23,11 @@ router.get(
   "/driver",
   authMiddleware,
   getDriverRequests
+);
+router.put(
+  "/update-status",
+  authMiddleware,
+  updateEmergencyStatus
 );
 
 export default router;

@@ -13,3 +13,7 @@ export const loginAdmin = async (data) => {
   const response = await api.post("/auth/admin/login", data);
   return response.data;
 };
+export const loginDriver = async (data) => {
+  const response = await api.post("/auth/driver/login", data);
+  return response.data;
+};

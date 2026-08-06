@@ -1,5 +1,6 @@
 import Patient from "../models/Patient.js";
 import Admin from "../models/Admin.js";
+import Driver from "../models/Driver.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -168,6 +169,69 @@ export const loginAdmin = async (req, res) => {
       token,
       admin: adminData,
     });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//Driver login 
+
+export const loginDriver = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and Password are required",
+      });
+    }
+
+    const driver = await Driver.findOne({ email });
+
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(
+      password,
+      driver.password
+    );
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: driver._id,
+        role: driver.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    const driverData = driver.toObject();
+    delete driverData.password;
+
+    res.status(200).json({
+      success: true,
+      message: "Driver login successful",
+      token,
+      driver: driverData,
+    });
+
   } catch (error) {
     res.status(500).json({
       success: false,

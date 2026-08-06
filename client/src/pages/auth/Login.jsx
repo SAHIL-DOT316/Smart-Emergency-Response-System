@@ -6,7 +6,7 @@ import PasswordInput from "../../components/auth/PasswordInput";
 import TextInput from "../../components/auth/TextInput";
 import SubmitButton from "../../components/common/SubmitButton";
 
-import { loginPatient, loginAdmin } from "../../services/authService";
+import { loginPatient, loginDriver,loginAdmin } from "../../services/authService";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
@@ -59,22 +59,29 @@ const handleSubmit = async (e) => {
  setLoading(true);
   try {
   let response;
+let userData;
 
 if (role === "patient") {
   response = await loginPatient(formData);
+  userData = response.patient;
+} else if (role === "driver") {
+  response = await loginDriver(formData);
+  userData = response.driver;
 } else {
   response = await loginAdmin(formData);
+  userData = response.admin;
 }
 
- login(
-  response.token,
-  response.patient || response.admin
-);
+login(response.token, userData);
 
-  console.log("Login Success:", response);
-  toast.success("Login Successful");
-  if (role === "patient") {
+console.log("Login Success:", response);
+
+toast.success("Login Successful");
+
+if (role === "patient") {
   navigate("/patient");
+} else if (role === "driver") {
+  navigate("/driver");
 } else {
   navigate("/admin");
 }
@@ -105,6 +112,7 @@ if (role === "patient") {
     onChange={(e) => setRole(e.target.value)}
   >
     <option value="patient">Patient</option>
+    <option value="driver">Driver</option>
     <option value="admin">Admin</option>
   </select>
 </div>

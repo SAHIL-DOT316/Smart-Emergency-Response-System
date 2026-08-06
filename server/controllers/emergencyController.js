@@ -154,3 +154,36 @@ export const getDriverRequests = async (req, res) => {
     });
   }
 };
+
+//status update  controller
+
+export const updateEmergencyStatus = async (req, res) => {
+  try {
+    const { requestId, status } = req.body;
+
+    const emergency = await EmergencyRequest.findById(requestId);
+
+    if (!emergency) {
+      return res.status(404).json({
+        success: false,
+        message: "Emergency request not found",
+      });
+    }
+
+    emergency.status = status;
+
+    await emergency.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Status updated successfully",
+      emergency,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
