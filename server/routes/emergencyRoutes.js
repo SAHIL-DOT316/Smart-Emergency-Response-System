@@ -4,6 +4,8 @@ import authMiddleware from "../middleware/authMiddleware.js";
 import {
   createEmergencyRequest,
   getAllEmergencyRequests,
+   getMyEmergencyRequests,
+    getAvailableDrivers,
   assignDriver,
   getDriverRequests,
   updateEmergencyStatus,
@@ -16,8 +18,18 @@ router.post(
   authMiddleware,
   createEmergencyRequest
 );
-
+router.get(
+  "/my-requests",
+  authMiddleware,
+  getMyEmergencyRequests
+);
+router.get(
+  "/available-drivers",
+  authMiddleware,
+  getAvailableDrivers
+);
 router.get("/", getAllEmergencyRequests);
+
 router.put("/assign-driver", assignDriver);
 router.get(
   "/driver",

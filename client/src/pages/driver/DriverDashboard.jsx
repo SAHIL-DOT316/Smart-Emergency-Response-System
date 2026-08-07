@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+
 import {
   getDriverRequests,
   updateEmergencyStatus,
@@ -8,15 +9,17 @@ import {
 function DriverDashboard() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(null);
 
   const fetchRequests = async () => {
     try {
       const response = await getDriverRequests();
-      setRequests(response.requests);
+
+      setRequests(response.requests || []);
     } catch (error) {
       toast.error(
         error.response?.data?.message ||
-        "Failed to load requests"
+          "Failed to load requests"
       );
     } finally {
       setLoading(false);
@@ -27,139 +30,210 @@ function DriverDashboard() {
     fetchRequests();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="container mt-4">
-        <h4>Loading...</h4>
-      </div>
-    );
-  }
-const handleStatusUpdate = async (
-  requestId,
-  status
-) => {
-  try {
-    const response =
-      await updateEmergencyStatus({
+  const handleStatusUpdate = async (requestId, status) => {
+    try {
+      setUpdating(requestId);
+
+      const response = await updateEmergencyStatus({
         requestId,
         status,
       });
 
-    toast.success(response.message);
+      toast.success(response.message);
 
-    fetchRequests();
-  } catch (error) {
-    toast.error(
-      error.response?.data?.message
+      await fetchRequests();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to update status"
+      );
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const getActionButton = (request) => {
+    if (request.status === "Accepted") {
+      return (
+        <button
+          className="btn btn-primary btn-sm"
+          disabled={updating === request._id}
+          onClick={() =>
+            handleStatusUpdate(
+              request._id,
+              "Driver Arrived"
+            )
+          }
+        >
+          {updating === request._id
+            ? "Updating..."
+            : "Driver Arrived"}
+        </button>
+      );
+    }
+
+    if (request.status === "Driver Arrived") {
+      return (
+        <button
+          className="btn btn-warning btn-sm"
+          disabled={updating === request._id}
+          onClick={() =>
+            handleStatusUpdate(
+              request._id,
+              "Patient Picked"
+            )
+          }
+        >
+          {updating === request._id
+            ? "Updating..."
+            : "Patient Picked"}
+        </button>
+      );
+    }
+
+    if (request.status === "Patient Picked") {
+      return (
+        <button
+          className="btn btn-success btn-sm"
+          disabled={updating === request._id}
+          onClick={() =>
+            handleStatusUpdate(
+              request._id,
+              "Completed"
+            )
+          }
+        >
+          {updating === request._id
+            ? "Updating..."
+            : "Complete"}
+        </button>
+      );
+    }
+
+    if (request.status === "Completed") {
+      return (
+        <span className="badge bg-success">
+          Completed
+        </span>
+      );
+    }
+
+    return (
+      <span className="text-muted">
+        Waiting...
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="container mt-4">
+        <h4>Loading emergency requests...</h4>
+      </div>
     );
   }
-};
+
   return (
     <div className="container mt-4">
 
-      <h2 className="mb-4">Driver Dashboard</h2>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2>Driver Dashboard</h2>
+          <p className="text-muted mb-0">
+            Manage your assigned emergency requests
+          </p>
+        </div>
 
-      <table className="table table-bordered table-hover">
+        <span className="badge bg-primary fs-6">
+          {requests.length} Requests
+        </span>
+      </div>
 
-        <thead className="table-dark">
-          <tr>
-            <th>Patient</th>
-            <th>Phone</th>
-            <th>Pickup Address</th>
-            <th>Emergency</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
+      <div className="table-responsive">
 
-        <tbody>
+        <table className="table table-bordered table-hover">
 
-          {requests.length > 0 ? (
+          <thead className="table-dark">
+            <tr>
+              <th>Patient</th>
+              <th>Phone</th>
+              <th>Pickup Address</th>
+              <th>Emergency</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
 
-            requests.map((request) => (
+          <tbody>
 
-              <tr key={request._id}>
+            {requests.length > 0 ? (
 
-                <td>{request.patient?.fullName}</td>
+              requests.map((request) => (
 
-                <td>{request.patient?.phone}</td>
+                <tr key={request._id}>
 
-                <td>{request.pickupAddress}</td>
+                  <td>
+                    {request.patient?.fullName ||
+                      "N/A"}
+                  </td>
 
-                <td>{request.emergencyType}</td>
+                  <td>
+                    {request.patient?.phone ||
+                      "N/A"}
+                  </td>
 
-                <td>
-                  <span className="badge bg-warning text-dark">
-                    {request.status}
-                  </span>
+                  <td>
+                    {request.pickupAddress ||
+                      "N/A"}
+                  </td>
+
+                  <td>
+                    {request.emergencyType ||
+                      "N/A"}
+                  </td>
+
+                  <td>
+                    <span
+                      className={`badge ${
+                        request.status ===
+                        "Completed"
+                          ? "bg-success"
+                          : request.status ===
+                            "Accepted"
+                          ? "bg-primary"
+                          : "bg-warning text-dark"
+                      }`}
+                    >
+                      {request.status}
+                    </span>
+                  </td>
+
+                  <td>
+                    {getActionButton(request)}
+                  </td>
+
+                </tr>
+
+              ))
+
+            ) : (
+
+              <tr>
+                <td
+                  colSpan="6"
+                  className="text-center py-4"
+                >
+                  No assigned emergency requests
                 </td>
-                <td>
-  {request.status === "Accepted" && (
-    <button
-      className="btn btn-primary btn-sm"
-      onClick={() =>
-        handleStatusUpdate(
-          request._id,
-          "Driver Arrived"
-        )
-      }
-    >
-      Driver Arrived
-    </button>
-  )}
-
-  {request.status === "Driver Arrived" && (
-    <button
-      className="btn btn-warning btn-sm"
-      onClick={() =>
-        handleStatusUpdate(
-          request._id,
-          "Patient Picked"
-        )
-      }
-    >
-      Patient Picked
-    </button>
-  )}
-
-  {request.status === "Patient Picked" && (
-    <button
-      className="btn btn-success btn-sm"
-      onClick={() =>
-        handleStatusUpdate(
-          request._id,
-          "Completed"
-        )
-      }
-    >
-      Complete
-    </button>
-  )}
-
-  {request.status === "Completed" && (
-    <span className="badge bg-success">
-      Completed
-    </span>
-  )}
-</td>
-
               </tr>
 
-            ))
+            )}
 
-          ) : (
+          </tbody>
 
-            <tr>
-              <td colSpan="5" className="text-center">
-                No assigned requests
-              </td>
-            </tr>
+        </table>
 
-          )}
-
-        </tbody>
-
-      </table>
+      </div>
 
     </div>
   );

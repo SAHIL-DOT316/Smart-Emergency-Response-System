@@ -44,6 +44,56 @@ export const createEmergencyRequest = async (req, res) => {
   }
 };
 
+//Get my emergency request
+
+export const getMyEmergencyRequests = async (req, res) => {
+  try {
+    const requests = await EmergencyRequest.find({
+      patient: req.user.id
+    })
+      .populate(
+        "driver",
+        "fullName phone ambulanceNumber"
+      )
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      requests
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+//see all avaiable ablulance 
+// Get Available Ambulances
+export const getAvailableDrivers = async (req, res) => {
+  try {
+    const drivers = await Driver.find({
+      status: "available",
+    }).select(
+      "fullName phone ambulanceNumber status"
+    );
+
+    res.status(200).json({
+      success: true,
+      count: drivers.length,
+      drivers,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 //Get All Emergency Requests (Admin)
 

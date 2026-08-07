@@ -13,3 +13,18 @@ export const updateEmergencyStatus = async (data) => {
 
   return response.data;
 };
+
+export const getMyEmergencyRequests = async () => {
+  const response = await api.get("/emergency/my-requests");
+  return response.data;
+};
+
+export const getAvailableDrivers = async () => {
+  const response = await api.get("/emergency/available-drivers");
+  return response.data;
+};
+
+export const createEmergencyRequest = async (data) => {
+  const response = await api.post("/emergency/request", data);
+  return response.data;
+};
