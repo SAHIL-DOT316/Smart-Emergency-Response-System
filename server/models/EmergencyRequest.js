@@ -40,10 +40,12 @@ const emergencyRequestSchema = new mongoose.Schema(
       enum: [
         "Accident",
         "Heart Attack",
-        "Fire",
+        "Fire / Burn",
         "Pregnancy",
         "Stroke",
         "Other",
+        "Breathing Problem",
+        "Serious Injury"
       ],
       required: true,
     },

@@ -43,6 +43,14 @@ const driverSchema = new mongoose.Schema(
       enum: ["available", "busy", "offline"],
       default: "offline",
     },
+    latitude: {
+     type: Number,
+     default: null,
+    },
+    longitude: {
+     type: Number,
+     default: null,
+    },
 
     role: {
       type: String,

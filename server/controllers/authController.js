@@ -210,7 +210,8 @@ export const loginDriver = async (req, res) => {
         message: "Invalid email or password",
       });
     }
-
+    driver.status = "available";
+    await driver.save();
     const token = jwt.sign(
       {
         id: driver._id,
@@ -230,6 +231,34 @@ export const loginDriver = async (req, res) => {
       message: "Driver login successful",
       token,
       driver: driverData,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const logoutDriver = async (req, res) => {
+  try {
+    const driver = await Driver.findById(req.user.id);
+
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found",
+      });
+    }
+
+    driver.status = "offline";
+
+    await driver.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Driver logged out successfully",
     });
 
   } catch (error) {

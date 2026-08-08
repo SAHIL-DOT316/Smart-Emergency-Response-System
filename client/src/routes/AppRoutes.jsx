@@ -16,58 +16,111 @@ import HospitalDashboard from "../pages/hospital/HospitalDashboard";
 import DashboardHome from "../pages/admin/DashboardHome";
 import Drivers from "../pages/admin/Drivers";
 import Hospitals from "../pages/admin/Hospitals";
+import EmergencyRequests from "../pages/admin/EmergencyRequests";
 import Profile from "../pages/admin/Profile";
+
 function AppRoutes() {
   return (
     <Routes>
 
-  <Route path="/" element={<LandingPage />} />
-  <Route path="/login" element={<Login />} />
-  <Route path="/register" element={<Register />} />
-  <Route path="/forgot-password" element={<ForgotPassword />} />
+      {/* Public Routes */}
 
-  <Route
-    path="/patient"
-    element={
-      <ProtectedRoute>
-        <PatientDashboard />
-      </ProtectedRoute>
-    }
-  />
+      <Route
+        path="/"
+        element={<LandingPage />}
+      />
 
-  <Route
-    path="/driver"
-    element={
-      <ProtectedRoute>
-        <DriverDashboard />
-      </ProtectedRoute>
-    }
-  />
+      <Route
+        path="/login"
+        element={<Login />}
+      />
 
-  <Route
-    path="/hospital"
-    element={
-      <ProtectedRoute>
-        <HospitalDashboard />
-      </ProtectedRoute>
-    }
-  />
+      <Route
+        path="/register"
+        element={<Register />}
+      />
 
-  <Route
-    path="/admin"
-    element={
-      <ProtectedRoute>
-        <AdminLayout />
-      </ProtectedRoute>
-    }
-  >
-    <Route index element={<DashboardHome />} />
-    <Route path="drivers" element={<Drivers />} />
-    <Route path="hospitals" element={<Hospitals />} />
-    <Route path="profile" element={<Profile />} />
-  </Route>
+      <Route
+        path="/forgot-password"
+        element={<ForgotPassword />}
+      />
 
-</Routes>
+
+      {/* Patient */}
+
+      <Route
+        path="/patient"
+        element={
+          <ProtectedRoute allowedRoles={["patient"]}>
+            <PatientDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+
+      {/* Driver */}
+
+      <Route
+        path="/driver"
+        element={
+          <ProtectedRoute allowedRoles={["driver"]}>
+            <DriverDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+
+      {/* Hospital */}
+
+      <Route
+        path="/hospital"
+        element={
+          <ProtectedRoute allowedRoles={["hospital"]}>
+            <HospitalDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+
+      {/* Admin */}
+
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+
+        <Route
+          index
+          element={<DashboardHome />}
+        />
+
+        <Route
+          path="drivers"
+          element={<Drivers />}
+        />
+
+        <Route
+          path="hospitals"
+          element={<Hospitals />}
+        />
+
+        <Route
+          path="emergency-requests"
+          element={<EmergencyRequests />}
+        />
+
+        <Route
+          path="profile"
+          element={<Profile />}
+        />
+
+      </Route>
+
+    </Routes>
   );
 }
 

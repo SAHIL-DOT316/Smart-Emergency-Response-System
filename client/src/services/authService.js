@@ -17,3 +17,11 @@ export const loginDriver = async (data) => {
   const response = await api.post("/auth/driver/login", data);
   return response.data;
 };
+
+export const logoutDriver = async () => {
+  const response = await api.put(
+    "/auth/driver/logout"
+  );
+
+  return response.data;
+};

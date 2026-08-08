@@ -28,3 +28,9 @@ export const createEmergencyRequest = async (data) => {
   const response = await api.post("/emergency/request", data);
   return response.data;
 };
+
+export const getAllEmergencyRequests = async () => {
+  const response = await api.get("/emergency");
+
+  return response.data;
+};

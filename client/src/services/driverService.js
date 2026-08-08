@@ -24,3 +24,12 @@ export const deleteDriver = async (id) => {
   const response = await api.delete(`/admin/drivers/${id}`);
   return response.data;
 };
+
+export const updateDriverLocation = async (latitude, longitude) => {
+  const response = await api.put("/driver/location", {
+    latitude,
+    longitude,
+  });
+
+  return response.data;
+};

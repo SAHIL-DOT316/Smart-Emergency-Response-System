@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import emergencyRoutes from "./routes/emergencyRoutes.js";
+import driverRoutes from "./routes/driverRoutes.js";
 
 import authMiddleware from "./middleware/authMiddleware.js";
 
@@ -24,7 +25,7 @@ app.get("/api/patient/profile", authMiddleware, (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/emergency", emergencyRoutes);
-
+app.use("/api/driver", driverRoutes);
 app.get("/", (req, res) => {
   res.json({
     success: true,

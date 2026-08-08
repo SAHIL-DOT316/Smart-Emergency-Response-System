@@ -36,7 +36,15 @@ function AdminLayout() {
             <i className="bi bi-speedometer2"></i>
             Dashboard
           </NavLink>
-
+           <NavLink
+            to="/admin/emergency-requests"
+            className={({ isActive }) =>
+              isActive ? "menu active" : "menu"
+            }
+          >
+            <i className="bi bi-truck-front-fill"></i>
+           Emergency Requests
+          </NavLink>
           <NavLink
             to="/admin/drivers"
             className={({ isActive }) =>

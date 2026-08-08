@@ -11,6 +11,10 @@ import {
 function PatientDashboard() {
   const [requests, setRequests] = useState([]);
   const [drivers, setDrivers] = useState([]);
+   
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+
+  const [emergencyType, setEmergencyType] = useState("");
 
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [loadingDrivers, setLoadingDrivers] = useState(true);
@@ -49,38 +53,85 @@ function PatientDashboard() {
     fetchDrivers();
   }, []);
 
-  const handleEmergencyRequest = async () => {
-    try {
-      setRequesting(true);
+ const handleEmergencyRequest = async () => {
+  if (!navigator.geolocation) {
+    toast.error("Geolocation is not supported by your browser.");
+    return;
+  }
 
-      // Temporary location.
-      // We'll replace this with real browser GPS next.
-      const latitude = 32.6155;
-      const longitude = 74.8896;
+  setRequesting(true);
 
-      const response = await createEmergencyRequest({
-        pickupAddress: "Bari Brahmana, Jammu",
-        latitude,
-        longitude,
-        emergencyType: "Accident",
-      });
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      try {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
 
-      toast.success(
-        "Emergency request sent to dispatch team"
-      );
+        console.log("Patient Location:", {
+          latitude,
+          longitude,
+        });
 
-      await fetchRequests();
-      await fetchDrivers();
+        const response = await createEmergencyRequest({
+          pickupAddress: "Current Location",
+          latitude,
+          longitude,
+          emergencyType: emergencyType,
+        });
 
-    } catch (error) {
-      toast.error(
-        error.response?.data?.message ||
-          "Failed to create emergency request"
-      );
-    } finally {
+        toast.success(
+          "Emergency request sent to dispatch team"
+        );
+         setEmergencyType("");
+         setShowEmergencyModal(false);
+        await fetchRequests();
+
+      } catch (error) {
+        toast.error(
+          error.response?.data?.message ||
+            "Failed to create emergency request"
+        );
+      } finally {
+        setRequesting(false);
+      }
+    },
+
+    (error) => {
       setRequesting(false);
+
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          toast.error(
+            "Location permission denied. Please allow location access."
+          );
+          break;
+
+        case error.POSITION_UNAVAILABLE:
+          toast.error(
+            "Unable to determine your location."
+          );
+          break;
+
+        case error.TIMEOUT:
+          toast.error(
+            "Location request timed out."
+          );
+          break;
+
+        default:
+          toast.error(
+            "Unable to get your location."
+          );
+      }
+    },
+
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
     }
-  };
+  );
+};
 
   const getStatusClass = (status) => {
     switch (status) {
@@ -164,15 +215,13 @@ function PatientDashboard() {
 
             <div className="col-md-4 text-md-end mt-3 mt-md-0">
 
-              <button
-                className="btn btn-danger btn-lg px-4"
-                onClick={handleEmergencyRequest}
-                disabled={requesting}
-              >
-                {requesting
-                  ? "Sending Request..."
-                  : "🚨 Request Ambulance"}
-              </button>
+             <button
+  className="btn btn-danger btn-lg px-4"
+  onClick={() => setShowEmergencyModal(true)}
+  disabled={requesting}
+>
+   Request Ambulance
+</button>
 
             </div>
 
@@ -416,9 +465,111 @@ function PatientDashboard() {
         )}
 
       </div>
+    {showEmergencyModal && (
+  <div
+    className="modal d-block"
+    style={{
+      background: "rgba(0,0,0,0.6)",
+    }}
+  >
+    <div className="modal-dialog modal-dialog-centered">
+      <div className="modal-content border-0 shadow">
+
+        <div className="modal-header">
+          <div>
+            <h5 className="modal-title fw-bold">
+              Emergency Request
+            </h5>
+
+            <small className="text-muted">
+              Select the type of emergency
+            </small>
+          </div>
+
+          <button
+            type="button"
+            className="btn-close"
+            onClick={() => {
+              setShowEmergencyModal(false);
+              setEmergencyType("");
+            }}
+          ></button>
+        </div>
+
+        <div className="modal-body">
+
+          <div className="row g-3">
+
+            {[
+              "Accident",
+              "Heart Attack",
+              "Breathing Problem",
+              "Serious Injury",
+              "Pregnancy",
+              "Stroke",
+              "Fire / Burn",
+              "Other",
+            ].map((type) => (
+              <div className="col-6" key={type}>
+
+                <button
+                  type="button"
+                  className={`btn w-100 py-3 ${
+                    emergencyType === type
+                      ? "btn-danger"
+                      : "btn-outline-secondary"
+                  }`}
+                  onClick={() => setEmergencyType(type)}
+                >
+                  <span className="fw-semibold">
+                    {type}
+                  </span>
+                </button>
+
+              </div>
+            ))}
+
+          </div>
+
+        </div>
+
+        <div className="modal-footer">
+
+          <button
+            type="button"
+            className="btn btn-light"
+            onClick={() => {
+              setShowEmergencyModal(false);
+              setEmergencyType("");
+            }}
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-danger px-4"
+            disabled={!emergencyType || requesting}
+            onClick={() => {
+              setShowEmergencyModal(false);
+              handleEmergencyRequest();
+            }}
+          >
+            {requesting
+              ? "Sending..."
+              : "Continue"}
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
     </>
+    
   );
 }
 
