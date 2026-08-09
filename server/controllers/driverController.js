@@ -41,3 +41,26 @@ export const updateDriverLocation = async (req, res) => {
     });
   }
 };
+export const getAvailableDrivers = async (req, res) => {
+  try {
+    const drivers = await Driver.find({
+      status: "available",
+      latitude: { $ne: null },
+      longitude: { $ne: null },
+    }).select(
+      "fullName phone ambulanceNumber latitude longitude status"
+    );
+
+    res.status(200).json({
+      success: true,
+      count: drivers.length,
+      drivers,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
