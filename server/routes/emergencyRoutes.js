@@ -6,6 +6,7 @@ import {
   getAllEmergencyRequests,
    getMyEmergencyRequests,
     getAvailableDrivers,
+     getNearestDrivers,
   assignDriver,
   getDriverRequests,
   updateEmergencyStatus,
@@ -27,6 +28,11 @@ router.get(
   "/available-drivers",
   authMiddleware,
   getAvailableDrivers
+);
+router.get(
+  "/nearest-drivers/:requestId",
+  authMiddleware,
+  getNearestDrivers
 );
 router.get("/", getAllEmergencyRequests);
 

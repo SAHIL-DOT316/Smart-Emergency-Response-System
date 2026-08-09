@@ -1,5 +1,6 @@
 import EmergencyRequest from "../models/EmergencyRequest.js";
 import Driver from "../models/Driver.js";
+import { calculateDistance } from "../utils/distance.js";
 
 export const createEmergencyRequest = async (req, res) => {
   try {
@@ -71,7 +72,6 @@ export const getMyEmergencyRequests = async (req, res) => {
 };
 
 
-//see all avaiable ablulance 
 // Get Available Ambulances
 export const getAvailableDrivers = async (req, res) => {
   try {
@@ -85,6 +85,68 @@ export const getAvailableDrivers = async (req, res) => {
       success: true,
       count: drivers.length,
       drivers,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get nearest available ambulances
+
+export const getNearestDrivers = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+
+    const emergency = await EmergencyRequest.findById(
+      requestId
+    );
+
+    if (!emergency) {
+      return res.status(404).json({
+        success: false,
+        message: "Emergency request not found",
+      });
+    }
+
+    const drivers = await Driver.find({
+      status: "available",
+      latitude: { $ne: null },
+      longitude: { $ne: null },
+    }).select(
+      "fullName phone ambulanceNumber latitude longitude status"
+    );
+
+    const driversWithDistance = drivers.map(
+      (driver) => {
+
+        const distance = calculateDistance(
+          emergency.latitude,
+          emergency.longitude,
+          driver.latitude,
+          driver.longitude
+        );
+
+        return {
+          ...driver.toObject(),
+          distance: Number(distance.toFixed(2)),
+        };
+      }
+    );
+
+    // Nearest driver first
+    driversWithDistance.sort(
+      (a, b) => a.distance - b.distance
+    );
+
+    res.status(200).json({
+      success: true,
+      requestId,
+      count: driversWithDistance.length,
+      drivers: driversWithDistance,
     });
 
   } catch (error) {

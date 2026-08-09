@@ -34,3 +34,22 @@ export const getAllEmergencyRequests = async () => {
 
   return response.data;
 };
+export const getNearestDrivers = async (requestId) => {
+  const response = await api.get(
+    `/emergency/nearest-drivers/${requestId}`
+  );
+
+  return response.data;
+};
+
+export const assignDriver = async (requestId, driverId) => {
+  const response = await api.put(
+    "/emergency/assign-driver",
+    {
+      requestId,
+      driverId,
+    }
+  );
+
+  return response.data;
+};
