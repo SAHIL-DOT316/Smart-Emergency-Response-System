@@ -83,139 +83,109 @@ function PatientDashboard() {
   // Create Emergency Request
   // ==============================
 
-  const handleEmergencyRequest = async () => {
-    if (!emergencyType) {
-      toast.error(
-        "Please select the type of emergency"
-      );
+  const handleEmergencyRequest = () => {
+  if (!emergencyType) {
+    toast.error("Please select the type of emergency");
+    return;
+  }
 
-      return;
-    }
-
-    if (!navigator.geolocation) {
-      toast.error(
-        "Geolocation is not supported by your browser."
-      );
-
-      return;
-    }
-
-    setRequesting(true);
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const latitude =
-            position.coords.latitude;
-
-          const longitude =
-            position.coords.longitude;
-
-          console.log(
-            "Patient Location:",
-            {
-              latitude,
-              longitude,
-            }
-          );
-
-          // ==================================
-          // Convert GPS coordinates to address
-          // ==================================
-
-          const pickupAddress =
-            await getAddressFromCoordinates(
-              latitude,
-              longitude
-            );
-
-          console.log(
-            "Pickup Address:",
-            pickupAddress
-          );
-
-          // ==================================
-          // Create Emergency Request
-          // ==================================
-
-          await createEmergencyRequest({
-            pickupAddress,
-            latitude,
-            longitude,
-            emergencyType,
-          });
-
-          toast.success(
-            "Emergency request sent successfully"
-          );
-
-          // Reset modal
-
-          setEmergencyType("");
-
-          setShowEmergencyModal(false);
-
-          // Refresh requests
-
-          await fetchRequests();
-
-        } catch (error) {
-          console.error(error);
-
-          toast.error(
-            error.response?.data?.message ||
-              error.message ||
-              "Failed to create emergency request"
-          );
-        } finally {
-          setRequesting(false);
-        }
-      },
-
-      (error) => {
-        setRequesting(false);
-
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-
-            toast.error(
-              "Location permission denied. Please allow location access."
-            );
-
-            break;
-
-          case error.POSITION_UNAVAILABLE:
-
-            toast.error(
-              "Unable to determine your current location."
-            );
-
-            break;
-
-          case error.TIMEOUT:
-
-            toast.error(
-              "Location request timed out."
-            );
-
-            break;
-
-          default:
-
-            toast.error(
-              "Unable to get your current location."
-            );
-        }
-      },
-
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
+  if (!navigator.geolocation) {
+    toast.error(
+      "Geolocation is not supported by your browser."
     );
-  };
+    return;
+  }
 
+  setRequesting(true);
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      try {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        console.log("Patient Location:", {
+          latitude,
+          longitude,
+        });
+
+        const response = await createEmergencyRequest({
+          pickupAddress: "Current Location",
+          latitude,
+          longitude,
+          emergencyType,
+        });
+
+        console.log("Emergency Response:", response);
+
+        // Automatic nearest-driver assignment
+        toast.success(
+          response.driver
+            ? `Ambulance ${
+                response.driver.ambulanceNumber
+              } assigned. ${
+                response.driver.distance
+              } km away.`
+            : "Emergency request created. Waiting for an available ambulance."
+        );
+
+        setEmergencyType("");
+        setShowEmergencyModal(false);
+
+        await fetchRequests();
+        await fetchDrivers();
+
+      } catch (error) {
+        console.error(
+          "Emergency request error:",
+          error
+        );
+
+        toast.error(
+          error.response?.data?.message ||
+            "Failed to create emergency request"
+        );
+      } finally {
+        setRequesting(false);
+      }
+    },
+
+    (error) => {
+      setRequesting(false);
+
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          toast.error(
+            "Location permission denied. Please allow location access."
+          );
+          break;
+
+        case error.POSITION_UNAVAILABLE:
+          toast.error(
+            "Unable to determine your current location."
+          );
+          break;
+
+        case error.TIMEOUT:
+          toast.error(
+            "Location request timed out."
+          );
+          break;
+
+        default:
+          toast.error(
+            "Unable to get your current location."
+          );
+      }
+    },
+
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    }
+  );
+};
   // ==============================
   // Status Badge
   // ==============================

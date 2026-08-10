@@ -143,23 +143,36 @@ function EmergencyRequests() {
   // --------------------------------
 
   const pendingRequests = requests
-    .filter((request) => request.status === "Pending")
-    .sort(
-      (a, b) =>
-        getPriority(a.emergencyType) -
-        getPriority(b.emergencyType)
+  .filter((request) => request.status === "Pending")
+  .sort((a, b) => {
+    const priority = {
+      "Heart Attack": 1,
+      Stroke: 1,
+      Accident: 2,
+      "Breathing Problem": 2,
+      "Serious Injury": 2,
+      Pregnancy: 3,
+      "Fire / Burn": 3,
+      Other: 4,
+    };
+
+    return (
+      (priority[a.emergencyType] || 5) -
+      (priority[b.emergencyType] || 5)
     );
+  });
 
-  const activeRequests = requests.filter(
-    (request) =>
-      request.status === "Accepted" ||
-      request.status === "Driver Arrived" ||
-      request.status === "Patient Picked"
-  );
+const activeRequests = requests.filter(
+  (request) =>
+    request.status === "Accepted" ||
+    request.status === "Driver Arrived" ||
+    request.status === "Patient Picked"
+);
 
-  const completedRequests = requests.filter(
-    (request) => request.status === "Completed"
-  );
+const completedRequests = requests.filter(
+  (request) => request.status === "Completed"
+);
+
 
   // --------------------------------
   // Request Card
@@ -396,7 +409,7 @@ function EmergencyRequests() {
       </div>
     );
   }
-
+ 
   return (
     <div>
 

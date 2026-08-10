@@ -11,6 +11,7 @@ export const createEmergencyRequest = async (req, res) => {
       emergencyType,
     } = req.body;
 
+    // Validation
     if (
       !pickupAddress ||
       latitude === undefined ||
@@ -23,19 +24,94 @@ export const createEmergencyRequest = async (req, res) => {
       });
     }
 
+    // Find all available drivers having valid GPS location
+    const drivers = await Driver.find({
+      status: "available",
+      latitude: { $ne: null },
+      longitude: { $ne: null },
+    }).select(
+      "fullName phone ambulanceNumber latitude longitude status"
+    );
+
+    // No ambulance available
+    if (drivers.length === 0) {
+      return res.status(201).json({
+        success: true,
+        message:
+          "Emergency request created, but no ambulance is currently available",
+        emergency: await EmergencyRequest.create({
+          patient: req.user.id,
+          pickupAddress,
+          latitude,
+          longitude,
+          emergencyType,
+          status: "Pending",
+        }),
+      });
+    }
+
+    // Calculate distance from patient to every driver
+    const driversWithDistance = drivers.map((driver) => {
+      const distance = calculateDistance(
+        latitude,
+        longitude,
+        driver.latitude,
+        driver.longitude
+      );
+
+      return {
+        driver,
+        distance,
+      };
+    });
+
+    // Sort nearest driver first
+    driversWithDistance.sort(
+      (a, b) => a.distance - b.distance
+    );
+
+    // Nearest driver
+    const nearestDriver =
+      driversWithDistance[0].driver;
+
+    // Create emergency request
     const emergency = await EmergencyRequest.create({
       patient: req.user.id,
       pickupAddress,
       latitude,
       longitude,
       emergencyType,
-      status: "Pending",
+
+      // Automatically assign nearest driver
+      driver: nearestDriver._id,
+
+      // Driver accepted automatically
+      status: "Accepted",
     });
+
+    // Make driver busy
+    nearestDriver.status = "busy";
+
+    await nearestDriver.save();
 
     res.status(201).json({
       success: true,
-      message: "Emergency request created successfully",
+      message:
+        "Nearest ambulance assigned successfully",
+
       emergency,
+
+      driver: {
+        id: nearestDriver._id,
+        fullName: nearestDriver.fullName,
+        phone: nearestDriver.phone,
+        ambulanceNumber:
+          nearestDriver.ambulanceNumber,
+
+        distance: Number(
+          driversWithDistance[0].distance.toFixed(2)
+        ),
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -44,7 +120,6 @@ export const createEmergencyRequest = async (req, res) => {
     });
   }
 };
-
 //Get my emergency request
 
 export const getMyEmergencyRequests = async (req, res) => {
@@ -75,11 +150,13 @@ export const getMyEmergencyRequests = async (req, res) => {
 // Get Available Ambulances
 export const getAvailableDrivers = async (req, res) => {
   try {
-    const drivers = await Driver.find({
-      status: "available",
-    }).select(
-      "fullName phone ambulanceNumber status"
-    );
+   const drivers = await Driver.find({
+  status: "available",
+  latitude: { $ne: null },
+  longitude: { $ne: null },
+}).select(
+  "fullName phone ambulanceNumber latitude longitude status"
+);
 
     res.status(200).json({
       success: true,
@@ -101,14 +178,21 @@ export const getNearestDrivers = async (req, res) => {
   try {
     const { requestId } = req.params;
 
-    const emergency = await EmergencyRequest.findById(
-      requestId
-    );
+    const emergency =
+      await EmergencyRequest.findById(requestId);
 
     if (!emergency) {
       return res.status(404).json({
         success: false,
         message: "Emergency request not found",
+      });
+    }
+
+    if (emergency.status !== "Pending") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Nearest ambulances can only be found for pending requests",
       });
     }
 
@@ -120,36 +204,41 @@ export const getNearestDrivers = async (req, res) => {
       "fullName phone ambulanceNumber latitude longitude status"
     );
 
-    const driversWithDistance = drivers.map(
-      (driver) => {
+    const driversWithDistance = drivers.map((driver) => {
+      const distance = calculateDistance(
+        emergency.latitude,
+        emergency.longitude,
+        driver.latitude,
+        driver.longitude
+      );
 
-        const distance = calculateDistance(
-          emergency.latitude,
-          emergency.longitude,
-          driver.latitude,
-          driver.longitude
-        );
+      return {
+        ...driver.toObject(),
+        distance: Number(distance.toFixed(2)),
+      };
+    });
 
-        return {
-          ...driver.toObject(),
-          distance: Number(distance.toFixed(2)),
-        };
-      }
-    );
-
-    // Nearest driver first
     driversWithDistance.sort(
       (a, b) => a.distance - b.distance
     );
 
+    // Return nearest 5
+    const nearestDrivers =
+      driversWithDistance.slice(0, 5);
+
     res.status(200).json({
       success: true,
       requestId,
-      count: driversWithDistance.length,
-      drivers: driversWithDistance,
+      count: nearestDrivers.length,
+      drivers: nearestDrivers,
     });
 
   } catch (error) {
+    console.error(
+      "Get nearest drivers error:",
+      error
+    );
+
     res.status(500).json({
       success: false,
       message: error.message,
@@ -195,14 +284,27 @@ export const assignDriver = async (req, res) => {
     }
 
     const emergency = await EmergencyRequest.findById(requestId);
-
+     
     if (!emergency) {
       return res.status(404).json({
         success: false,
         message: "Emergency request not found",
       });
     }
+     if (emergency.driver) {
+  return res.status(400).json({
+    success: false,
+    message: "Driver is already assigned to this request",
+  });
+}
 
+if (emergency.status !== "Pending") {
+  return res.status(400).json({
+    success: false,
+    message: "Emergency request is not pending",
+  });
+}
+  
     const driver = await Driver.findById(driverId);
 
     if (!driver) {
