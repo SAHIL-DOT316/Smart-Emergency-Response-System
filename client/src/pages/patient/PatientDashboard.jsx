@@ -108,12 +108,18 @@ function PatientDashboard() {
           latitude,
           longitude,
         });
+          const pickupAddress =
+  await getAddressFromCoordinates(
+    latitude,
+    longitude
+  );
 
+console.log("Pickup Address:", pickupAddress);
         const response = await createEmergencyRequest({
-          pickupAddress: "Current Location",
+          pickupAddress: pickupAddress || "Current Location",
           latitude,
           longitude,
-          emergencyType,
+          emergencyType: emergencyType,
         });
 
         console.log("Emergency Response:", response);

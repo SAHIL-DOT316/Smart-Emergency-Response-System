@@ -1,6 +1,7 @@
 import EmergencyRequest from "../models/EmergencyRequest.js";
 import Driver from "../models/Driver.js";
 import { calculateDistance } from "../utils/distance.js";
+import { sendEmergencyToDriver } from "../socket/socketManager.js";
 
 export const createEmergencyRequest = async (req, res) => {
   try {
@@ -11,7 +12,6 @@ export const createEmergencyRequest = async (req, res) => {
       emergencyType,
     } = req.body;
 
-    // Validation
     if (
       !pickupAddress ||
       latitude === undefined ||
@@ -24,7 +24,23 @@ export const createEmergencyRequest = async (req, res) => {
       });
     }
 
-    // Find all available drivers having valid GPS location
+    // ==========================================
+    // CREATE EMERGENCY REQUEST
+    // ==========================================
+
+    const emergency = await EmergencyRequest.create({
+      patient: req.user.id,
+      pickupAddress,
+      latitude,
+      longitude,
+      emergencyType,
+      status: "Pending",
+    });
+
+    // ==========================================
+    // FIND AVAILABLE DRIVERS
+    // ==========================================
+
     const drivers = await Driver.find({
       status: "available",
       latitude: { $ne: null },
@@ -33,88 +49,140 @@ export const createEmergencyRequest = async (req, res) => {
       "fullName phone ambulanceNumber latitude longitude status"
     );
 
-    // No ambulance available
+    // ==========================================
+    // NO DRIVER AVAILABLE
+    // ==========================================
+
     if (drivers.length === 0) {
       return res.status(201).json({
         success: true,
         message:
-          "Emergency request created, but no ambulance is currently available",
-        emergency: await EmergencyRequest.create({
-          patient: req.user.id,
-          pickupAddress,
-          latitude,
-          longitude,
-          emergencyType,
-          status: "Pending",
-        }),
+          "Emergency request created. No ambulance is currently available.",
+        emergency,
       });
     }
 
-    // Calculate distance from patient to every driver
-    const driversWithDistance = drivers.map((driver) => {
-      const distance = calculateDistance(
-        latitude,
-        longitude,
-        driver.latitude,
-        driver.longitude
-      );
+    // ==========================================
+    // CALCULATE DISTANCE
+    // ==========================================
 
-      return {
-        driver,
-        distance,
-      };
-    });
+    const driversWithDistance = drivers.map(
+      (driver) => {
+        const distance = calculateDistance(
+          latitude,
+          longitude,
+          driver.latitude,
+          driver.longitude
+        );
 
-    // Sort nearest driver first
+        return {
+          ...driver.toObject(),
+          distance,
+        };
+      }
+    );
+
+    // ==========================================
+    // SORT NEAREST FIRST
+    // ==========================================
+
     driversWithDistance.sort(
       (a, b) => a.distance - b.distance
     );
 
-    // Nearest driver
+    // ==========================================
+    // SELECT NEAREST DRIVER
+    // ==========================================
+
     const nearestDriver =
-      driversWithDistance[0].driver;
+      driversWithDistance[0];
 
-    // Create emergency request
-    const emergency = await EmergencyRequest.create({
-      patient: req.user.id,
-      pickupAddress,
-      latitude,
-      longitude,
-      emergencyType,
+    // ==========================================
+    // ASSIGN DRIVER
+    // ==========================================
 
-      // Automatically assign nearest driver
-      driver: nearestDriver._id,
+    emergency.driver =
+      nearestDriver._id;
 
-      // Driver accepted automatically
-      status: "Accepted",
-    });
+    emergency.status = "Accepted";
 
-    // Make driver busy
-    nearestDriver.status = "busy";
+    await emergency.save();
 
-    await nearestDriver.save();
+    // ==========================================
+    // MAKE DRIVER BUSY
+    // ==========================================
 
-    res.status(201).json({
+    await Driver.findByIdAndUpdate(
+      nearestDriver._id,
+      {
+        status: "busy",
+      }
+    );
+
+    // ==========================================
+    // SEND SOCKET NOTIFICATION
+    // ==========================================
+
+    const io = req.app.get("io");
+
+    let notificationSent = false;
+
+    if (io) {
+      notificationSent =
+        sendEmergencyToDriver(
+          io,
+          nearestDriver._id,
+          {
+            requestId: emergency._id,
+            emergencyType:
+              emergency.emergencyType,
+            pickupAddress:
+              emergency.pickupAddress,
+            latitude:
+              emergency.latitude,
+            longitude:
+              emergency.longitude,
+            distance: Number(
+              nearestDriver.distance.toFixed(2)
+            ),
+            patient: req.user.id,
+          }
+        );
+    }
+
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+
+    return res.status(201).json({
       success: true,
-      message:
-        "Nearest ambulance assigned successfully",
+
+      message: notificationSent
+        ? "Emergency created and nearest ambulance assigned."
+        : "Emergency created and ambulance assigned, but driver is currently offline.",
 
       emergency,
 
       driver: {
-        id: nearestDriver._id,
+        _id: nearestDriver._id,
         fullName: nearestDriver.fullName,
         phone: nearestDriver.phone,
         ambulanceNumber:
           nearestDriver.ambulanceNumber,
-
         distance: Number(
-          driversWithDistance[0].distance.toFixed(2)
+          nearestDriver.distance.toFixed(2)
         ),
+        online: notificationSent,
       },
     });
+
   } catch (error) {
-    res.status(500).json({
+    console.error(
+      "Create Emergency Error:",
+      error
+    );
+
+    return res.status(500).json({
       success: false,
       message: error.message,
     });

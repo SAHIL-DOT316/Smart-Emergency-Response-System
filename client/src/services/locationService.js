@@ -28,15 +28,21 @@ export const getAddressFromCoordinates = async (
   latitude,
   longitude
 ) => {
-  const response = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-  );
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+    );
 
-  if (!response.ok) {
-    throw new Error("Failed to get location address");
+    const data = await response.json();
+
+    return data.display_name || "Unknown Location";
+
+  } catch (error) {
+    console.error(
+      "Reverse geocoding failed:",
+      error
+    );
+
+    return "Unknown Location";
   }
-
-  const data = await response.json();
-
-  return data.display_name || "Current Location";
 };
