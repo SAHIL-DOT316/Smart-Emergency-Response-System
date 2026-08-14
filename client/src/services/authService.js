@@ -25,3 +25,8 @@ export const logoutDriver = async () => {
 
   return response.data;
 };
+
+export const loginHospital = async (data) => {
+  const response = await api.post("/auth/hospital/login", data);
+  return response.data;
+};

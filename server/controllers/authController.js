@@ -1,6 +1,7 @@
 import Patient from "../models/Patient.js";
 import Admin from "../models/Admin.js";
 import Driver from "../models/Driver.js";
+import Hospital from "../models/Hospital.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
@@ -259,6 +260,68 @@ export const logoutDriver = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Driver logged out successfully",
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const loginHospital = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and Password are required",
+      });
+    }
+
+    const hospital = await Hospital.findOne({ email });
+
+    if (!hospital) {
+      return res.status(404).json({
+        success: false,
+        message: "Hospital not found",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(
+      password,
+      hospital.password
+    );
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: hospital._id,
+        role: hospital.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    const hospitalData = hospital.toObject();
+
+    delete hospitalData.password;
+
+    res.status(200).json({
+      success: true,
+      message: "Hospital login successful",
+      token,
+      hospital: hospitalData,
     });
 
   } catch (error) {

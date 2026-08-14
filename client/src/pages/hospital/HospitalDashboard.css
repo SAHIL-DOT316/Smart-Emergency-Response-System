@@ -1,0 +1,729 @@
+/* =========================================
+   MAIN DASHBOARD
+========================================= */
+
+.hospital-dashboard {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  background: #f4f7fb;
+}
+
+
+/* =========================================
+   BACKGROUND IMAGE
+========================================= */
+
+.hospital-background {
+  position: fixed;
+  inset: 0;
+
+  background-image: url("/hospital-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  z-index: 0;
+}
+
+
+/* =========================================
+   BACKGROUND OVERLAY
+========================================= */
+
+.hospital-overlay {
+  position: fixed;
+  inset: 0;
+
+  background: linear-gradient(
+    135deg,
+    rgba(5, 30, 55, 0.88),
+    rgba(13, 71, 161, 0.70),
+    rgba(255, 255, 255, 0.80)
+  );
+
+  z-index: 1;
+
+  pointer-events: none;
+}
+
+
+/* =========================================
+   CONTENT LAYER
+========================================= */
+
+.hospital-dashboard > .container-fluid {
+  position: relative;
+  z-index: 2;
+
+  min-height: 100vh;
+
+  padding-top: 25px;
+  padding-bottom: 30px;
+}
+
+
+/* =========================================
+   HEADER
+========================================= */
+
+.hospital-header {
+  position: relative;
+  z-index: 5;
+
+  padding: 18px 24px;
+  margin-bottom: 25px;
+
+  border-radius: 18px;
+
+  background: rgba(255, 255, 255, 0.12);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  border: 1px solid rgba(255, 255, 255, 0.20);
+
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+
+/* =========================================
+   HOSPITAL LOGO
+========================================= */
+
+.hospital-logo {
+  width: 55px;
+  height: 55px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 15px;
+
+  background: rgba(255, 255, 255, 0.18);
+
+  color: white;
+
+  font-size: 25px;
+
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+
+/* =========================================
+   ONLINE STATUS
+========================================= */
+
+.hospital-online-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 8px 14px;
+
+  border-radius: 30px;
+
+  background: rgba(25, 135, 84, 0.90);
+
+  color: white;
+
+  font-size: 14px;
+  font-weight: 600;
+}
+
+
+.online-dot {
+  width: 9px;
+  height: 9px;
+
+  background: #ffffff;
+
+  border-radius: 50%;
+
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.18);
+}
+
+
+/* =========================================
+   HERO
+========================================= */
+
+.hospital-hero {
+  position: relative;
+  z-index: 3;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 35px;
+
+  margin-bottom: 25px;
+
+  border-radius: 22px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(13, 71, 161, 0.94),
+      rgba(0, 121, 107, 0.88)
+    );
+
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.20);
+
+  overflow: hidden;
+}
+
+
+.hero-hospital-icon {
+  width: 110px;
+  height: 110px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.15);
+
+  color: white;
+
+  font-size: 55px;
+
+  flex-shrink: 0;
+}
+
+
+/* =========================================
+   STAT CARDS
+========================================= */
+
+.dashboard-stat-card {
+  position: relative;
+  z-index: 3;
+
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 18px;
+
+  padding: 22px;
+
+  background: rgba(255, 255, 255, 0.96);
+
+  border-radius: 18px;
+
+  border: 1px solid rgba(255, 255, 255, 0.7);
+
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.12);
+
+  transition: all 0.25s ease;
+}
+
+
+.dashboard-stat-card:hover {
+  transform: translateY(-5px);
+
+  box-shadow:
+    0 16px 35px rgba(0, 0, 0, 0.18);
+}
+
+
+/* =========================================
+   STAT ICONS
+========================================= */
+
+.stat-icon {
+  width: 55px;
+  height: 55px;
+
+  min-width: 55px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 15px;
+
+  font-size: 22px;
+}
+
+
+.stat-icon.blue {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+
+.stat-icon.green {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+
+.stat-icon.orange {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+
+.stat-icon.red {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+
+.stat-title {
+  color: #6c757d;
+
+  font-size: 14px;
+
+  margin-bottom: 3px;
+}
+
+
+.stat-value {
+  color: #212529;
+
+  font-size: 28px;
+
+  font-weight: 700;
+
+  line-height: 1.1;
+}
+
+
+.stat-description {
+  color: #8a94a6;
+
+  font-size: 12px;
+
+  margin-top: 4px;
+}
+
+
+/* =========================================
+   COMMON DASHBOARD CARD
+========================================= */
+
+.dashboard-card {
+  position: relative;
+  z-index: 3;
+
+  height: 100%;
+
+  background: rgba(255, 255, 255, 0.97);
+
+  border-radius: 20px;
+
+  padding: 24px;
+
+  border: 1px solid rgba(255, 255, 255, 0.8);
+
+  box-shadow:
+    0 12px 35px rgba(0, 0, 0, 0.12);
+
+  overflow: hidden;
+}
+
+
+/* =========================================
+   CARD HEADER
+========================================= */
+
+.card-header-custom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+
+  gap: 15px;
+
+  padding-bottom: 18px;
+
+  margin-bottom: 18px;
+
+  border-bottom: 1px solid #edf0f4;
+}
+
+
+/* =========================================
+   HOSPITAL INFORMATION
+========================================= */
+
+.hospital-info-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 18px;
+}
+
+
+.hospital-info-item {
+  display: flex;
+
+  align-items: center;
+
+  gap: 14px;
+
+  padding: 12px;
+
+  border-radius: 12px;
+
+  background: #f8fafc;
+}
+
+
+.info-icon {
+  width: 40px;
+  height: 40px;
+
+  min-width: 40px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: #e8f0fe;
+
+  color: #2563eb;
+}
+
+
+.hospital-info-item small {
+  display: block;
+
+  color: #8a94a6;
+
+  font-size: 11px;
+
+  margin-bottom: 2px;
+}
+
+
+.hospital-info-item strong {
+  display: block;
+
+  color: #263238;
+
+  font-size: 14px;
+
+  word-break: break-word;
+}
+
+
+
+.location-card {
+  min-height: 100%;
+}
+
+
+.location-status {
+  display: flex;
+
+  align-items: center;
+
+  gap: 15px;
+
+  padding: 16px;
+
+  border-radius: 14px;
+
+  margin-bottom: 18px;
+}
+
+
+.location-success {
+  background: #e8f5e9;
+
+  color: #2e7d32;
+}
+
+
+.location-warning {
+  background: #fff8e1;
+
+  color: #f57c00;
+}
+
+
+.location-big-icon {
+  font-size: 28px;
+
+  display: flex;
+
+  align-items: center;
+}
+
+
+.location-address {
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 12px;
+
+  padding: 16px;
+
+  border-radius: 12px;
+
+  background: #f8fafc;
+
+  color: #374151;
+
+  font-size: 14px;
+
+  line-height: 1.6;
+}
+
+
+.location-address svg {
+  color: #dc3545;
+
+  margin-top: 3px;
+
+  flex-shrink: 0;
+}
+
+
+/* 
+   COORDINATES
+ */
+
+.coordinate-box {
+  padding: 15px;
+
+  border-radius: 12px;
+
+  background: #f8fafc;
+
+  border: 1px solid #edf0f4;
+}
+
+
+.coordinate-box small {
+  display: block;
+
+  color: #8a94a6;
+
+  font-size: 12px;
+
+  margin-bottom: 5px;
+}
+
+
+.coordinate-box strong {
+  color: #263238;
+
+  font-size: 15px;
+}
+
+
+/* 
+   BED MANAGEMENT
+*/
+
+.bed-progress-container {
+  padding-top: 8px;
+}
+
+
+.progress {
+  height: 10px;
+
+  border-radius: 20px;
+
+  background: #e9ecef;
+
+  overflow: hidden;
+}
+
+
+.progress-bar {
+  border-radius: 20px;
+
+  transition: width 0.5s ease;
+}
+
+
+.bed-number {
+  font-size: 25px;
+
+  font-weight: 700;
+
+  margin-bottom: 3px;
+}
+
+
+/* 
+   EMPTY STATE
+ */
+
+.empty-state {
+  text-align: center;
+
+  padding: 45px 20px;
+}
+
+
+.empty-icon {
+  width: 70px;
+  height: 70px;
+
+  margin: 0 auto 15px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #f1f5f9;
+
+  color: #94a3b8;
+
+  font-size: 28px;
+}
+
+
+/* 
+   FOOTER
+*/
+
+.hospital-footer {
+  position: relative;
+  z-index: 3;
+
+  display: flex;
+
+  justify-content: space-between;
+
+  padding: 20px 5px;
+
+  margin-top: 25px;
+
+  color: rgba(255, 255, 255, 0.85);
+
+  font-size: 13px;
+}
+
+
+/* 
+   SPINNER
+ */
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* 
+   RESPONSIVE
+ */
+
+@media (max-width: 768px) {
+
+  .hospital-dashboard > .container-fluid {
+    padding: 15px;
+  }
+
+
+  .hospital-header {
+    padding: 15px;
+  }
+
+
+  .hospital-header
+  .d-flex {
+    flex-wrap: wrap;
+  }
+
+
+  .hospital-hero {
+    padding: 25px;
+
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 20px;
+  }
+
+
+  .hero-hospital-icon {
+    width: 75px;
+    height: 75px;
+
+    font-size: 35px;
+  }
+
+
+  .dashboard-card {
+    padding: 18px;
+  }
+
+
+  .card-header-custom {
+    flex-direction: column;
+  }
+
+
+  .hospital-footer {
+    flex-direction: column;
+
+    gap: 8px;
+  }
+}
+
+
+@media (max-width: 576px) {
+
+  .hospital-header h3 {
+    font-size: 18px;
+  }
+
+
+  .hospital-online-status {
+    font-size: 12px;
+  }
+
+
+  .dashboard-stat-card {
+    padding: 17px;
+  }
+
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+
+  .hospital-hero h1 {
+    font-size: 25px;
+  }
+}

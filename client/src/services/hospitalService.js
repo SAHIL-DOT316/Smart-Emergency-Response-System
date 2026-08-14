@@ -24,3 +24,31 @@ export const deleteHospital = async (id) => {
   const response = await api.delete(`/admin/hospitals/${id}`);
   return response.data;
 };
+
+export const updateHospitalLocation =
+  async (latitude, longitude) => {
+
+    const response =
+      await api.put(
+        "/hospital/location",
+        {
+          latitude,
+          longitude,
+        }
+      );
+
+    return response.data;
+  };
+  export const updateHospitalBeds = async (
+  availableBeds
+) => {
+
+  const response = await api.put(
+    "/hospital/beds",
+    {
+      availableBeds,
+    }
+  );
+
+  return response.data;
+};

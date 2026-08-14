@@ -45,6 +45,23 @@ const hospitalSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // Hospital GPS location
+    latitude: {
+      type: Number,
+      default: null,
+    },
+
+    longitude: {
+      type: Number,
+      default: null,
+    },
+
+    // Has hospital set its location?
+    locationSet: {
+      type: Boolean,
+      default: false,
+    },
+
     role: {
       type: String,
       default: "hospital",

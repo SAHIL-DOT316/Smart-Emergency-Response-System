@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import emergencyRoutes from "./routes/emergencyRoutes.js";
 import driverRoutes from "./routes/driverRoutes.js";
+import hospitalRoutes from "./routes/hospitalRoutes.js";
 
 import authMiddleware from "./middleware/authMiddleware.js";
 
@@ -26,6 +27,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/emergency", emergencyRoutes);
 app.use("/api/driver", driverRoutes);
+app.use("/api/hospital", hospitalRoutes);
 app.get("/", (req, res) => {
   res.json({
     success: true,
