@@ -1,9 +1,6 @@
 import Hospital from "../models/Hospital.js";
 
 
-// =========================================
-// UPDATE HOSPITAL LOCATION
-// =========================================
 
 export const updateHospitalLocation = async (
   req,
@@ -18,10 +15,6 @@ export const updateHospitalLocation = async (
       longitude,
     } = req.body;
 
-    // =====================================
-    // VALIDATION
-    // =====================================
-
     if (
       latitude === undefined ||
       longitude === undefined
@@ -33,9 +26,7 @@ export const updateHospitalLocation = async (
       });
     }
 
-    // =====================================
-    // VALIDATE RANGE
-    // =====================================
+  
 
     if (
       latitude < -90 ||
@@ -49,9 +40,7 @@ export const updateHospitalLocation = async (
       });
     }
 
-    // =====================================
-    // FIND HOSPITAL
-    // =====================================
+  
 
     const hospital =
       await Hospital.findById(hospitalId);
@@ -63,19 +52,12 @@ export const updateHospitalLocation = async (
       });
     }
 
-    // =====================================
-    // UPDATE LOCATION
-    // =====================================
-
     hospital.latitude = latitude;
     hospital.longitude = longitude;
     hospital.locationSet = true;
 
     await hospital.save();
 
-    // =====================================
-    // RESPONSE
-    // =====================================
 
     return res.status(200).json({
       success: true,
