@@ -61,6 +61,11 @@ const hospitalSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    status: {
+  type: String,
+  enum: ["online", "offline"],
+  default: "offline",
+},
 
     role: {
       type: String,

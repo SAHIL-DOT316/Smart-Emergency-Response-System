@@ -10,6 +10,11 @@ import {
   assignDriver,
   getDriverRequests,
   updateEmergencyStatus,
+  getNearestHospitals,
+   getHospitalRequests,
+   acceptHospitalEmergency,
+rejectHospitalEmergency,
+assignHospital,
 } from "../controllers/emergencyController.js";
 
 const router = express.Router();
@@ -47,5 +52,32 @@ router.put(
   authMiddleware,
   updateEmergencyStatus
 );
+// Hospital Emergency Route
+ router.get(
+  "/hospital",
+  authMiddleware,
+  getHospitalRequests
+);
+router.get(
+  "/nearest-hospitals/:requestId",
+  authMiddleware,
+  getNearestHospitals
+);
+router.put(
+  "/assign-hospital",
+  authMiddleware,
+  assignHospital
+);
 
+router.put(
+  "/hospital/accept",
+  authMiddleware,
+  acceptHospitalEmergency
+);
+
+router.put(
+  "/hospital/reject",
+  authMiddleware,
+  rejectHospitalEmergency
+);
 export default router;

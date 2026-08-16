@@ -1,4 +1,5 @@
 import EmergencyRequest from "../models/EmergencyRequest.js";
+import Hospital from "../models/Hospital.js";
 import Driver from "../models/Driver.js";
 import { calculateDistance } from "../utils/distance.js";
 import { sendEmergencyToDriver } from "../socket/socketManager.js";
@@ -24,9 +25,7 @@ export const createEmergencyRequest = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // CREATE EMERGENCY REQUEST
-    // ==========================================
+   
 
     const emergency = await EmergencyRequest.create({
       patient: req.user.id,
@@ -37,10 +36,7 @@ export const createEmergencyRequest = async (req, res) => {
       status: "Pending",
     });
 
-    // ==========================================
-    // FIND AVAILABLE DRIVERS
-    // ==========================================
-
+    
     const drivers = await Driver.find({
       status: "available",
       latitude: { $ne: null },
@@ -49,9 +45,7 @@ export const createEmergencyRequest = async (req, res) => {
       "fullName phone ambulanceNumber latitude longitude status"
     );
 
-    // ==========================================
-    // NO DRIVER AVAILABLE
-    // ==========================================
+    
 
     if (drivers.length === 0) {
       return res.status(201).json({
@@ -62,9 +56,7 @@ export const createEmergencyRequest = async (req, res) => {
       });
     }
 
-    // ==========================================
-    // CALCULATE DISTANCE
-    // ==========================================
+    
 
     const driversWithDistance = drivers.map(
       (driver) => {
@@ -90,9 +82,7 @@ export const createEmergencyRequest = async (req, res) => {
       (a, b) => a.distance - b.distance
     );
 
-    // ==========================================
-    // SELECT NEAREST DRIVER
-    // ==========================================
+    
 
     const nearestDriver =
       driversWithDistance[0];
@@ -464,6 +454,367 @@ export const updateEmergencyStatus = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Hospital Emergency service
+
+// Get nearest hospitals with available emergency beds
+export const getNearestHospitals = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+
+    // Find emergency request
+    const emergency = await EmergencyRequest.findById(requestId);
+
+    if (!emergency) {
+      return res.status(404).json({
+        success: false,
+        message: "Emergency request not found",
+      });
+    }
+
+    // Find hospitals having:
+    // 1. location
+    // 2. available emergency beds
+    const hospitals = await Hospital.find({
+  latitude: { $ne: null },
+  longitude: { $ne: null },
+  locationSet: true,
+  status: "online",
+  emergencyBeds: { $gt: 0 },
+  availableBeds: { $gt: 0 },
+}).select(
+  "hospitalName phone email address city latitude longitude emergencyBeds availableBeds status"
+);
+
+    // Calculate distance
+    const hospitalsWithDistance = hospitals.map(
+      (hospital) => {
+        const distance = calculateDistance(
+          emergency.latitude,
+          emergency.longitude,
+          hospital.latitude,
+          hospital.longitude
+        );
+
+        return {
+          ...hospital.toObject(),
+          distance: Number(distance.toFixed(2)),
+        };
+      }
+    );
+
+    // Nearest hospital first
+    hospitalsWithDistance.sort(
+      (a, b) => a.distance - b.distance
+    );
+
+    // Return nearest 5 hospitals
+    const nearestHospitals =
+      hospitalsWithDistance.slice(0, 5);
+
+    return res.status(200).json({
+      success: true,
+      requestId,
+      count: nearestHospitals.length,
+      hospitals: nearestHospitals,
+    });
+
+  } catch (error) {
+    console.error(
+      "Get nearest hospitals error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+// ==========================================
+// GET HOSPITAL EMERGENCY REQUESTS
+// ==========================================
+
+export const getHospitalRequests = async (req, res) => {
+  try {
+    const hospitalId = req.user.id;
+
+    const requests = await EmergencyRequest.find({
+      hospital: hospitalId,
+      status: {
+        $in: [
+          "Hospital Assigned",
+          "Hospital Accepted",
+          "Patient Arrived",
+        ],
+      },
+    })
+      .populate(
+        "patient",
+        "fullName phone email"
+      )
+      .populate(
+        "driver",
+        "fullName phone ambulanceNumber"
+      )
+      .populate(
+        "hospital",
+        "hospitalName phone city availableBeds"
+      )
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: requests.length,
+      requests,
+    });
+
+  } catch (error) {
+    console.error(
+      "Get Hospital Requests Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+ export const acceptHospitalEmergency = async (req, res) => {
+  try {
+    const hospitalId = req.user.id;
+    const { requestId } = req.body;
+
+    if (!requestId) {
+      return res.status(400).json({
+        success: false,
+        message: "Request ID is required",
+      });
+    }
+
+    const emergency =
+      await EmergencyRequest.findById(requestId);
+
+    if (!emergency) {
+      return res.status(404).json({
+        success: false,
+        message: "Emergency request not found",
+      });
+    }
+
+    // Make sure this request belongs to this hospital
+    if (
+      !emergency.hospital ||
+      emergency.hospital.toString() !== hospitalId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "This emergency is not assigned to your hospital",
+      });
+    }
+
+    // Check status
+    if (emergency.status !== "Hospital Assigned") {
+      return res.status(400).json({
+        success: false,
+        message: "Emergency cannot be accepted at this stage",
+      });
+    }
+
+    const hospital =
+      await Hospital.findById(hospitalId);
+
+    if (!hospital) {
+      return res.status(404).json({
+        success: false,
+        message: "Hospital not found",
+      });
+    }
+
+    // Check beds
+    if (hospital.availableBeds <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No emergency beds available",
+      });
+    }
+
+    // Reserve one bed
+    hospital.availableBeds -= 1;
+
+    emergency.status = "Hospital Accepted";
+
+    await hospital.save();
+    await emergency.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Emergency accepted successfully",
+      emergency,
+      availableBeds: hospital.availableBeds,
+    });
+
+  } catch (error) {
+    console.error(
+      "Accept Hospital Emergency Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+export const rejectHospitalEmergency = async (req, res) => {
+  try {
+    const hospitalId = req.user.id;
+    const { requestId } = req.body;
+
+    const emergency =
+      await EmergencyRequest.findById(requestId);
+
+    if (!emergency) {
+      return res.status(404).json({
+        success: false,
+        message: "Emergency request not found",
+      });
+    }
+
+    if (
+      !emergency.hospital ||
+      emergency.hospital.toString() !== hospitalId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "This emergency is not assigned to your hospital",
+      });
+    }
+
+    if (emergency.status !== "Hospital Assigned") {
+      return res.status(400).json({
+        success: false,
+        message: "Emergency cannot be rejected now",
+      });
+    }
+
+    // Remove hospital
+    emergency.hospital = null;
+
+    emergency.status = "Accepted";
+
+    await emergency.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Hospital rejected the emergency",
+      emergency,
+    });
+
+  } catch (error) {
+    console.error(
+      "Reject Hospital Emergency Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+export const assignHospital = async (req, res) => {
+  try {
+    const { requestId, hospitalId } = req.body;
+
+    if (!requestId || !hospitalId) {
+      return res.status(400).json({
+        success: false,
+        message: "Request ID and Hospital ID are required",
+      });
+    }
+
+    const emergency =
+      await EmergencyRequest.findById(requestId);
+
+    if (!emergency) {
+      return res.status(404).json({
+        success: false,
+        message: "Emergency request not found",
+      });
+    }
+
+    if (emergency.hospital) {
+      return res.status(400).json({
+        success: false,
+        message: "Hospital already assigned",
+      });
+    }
+
+    const hospital =
+      await Hospital.findById(hospitalId);
+
+    if (!hospital) {
+      return res.status(404).json({
+        success: false,
+        message: "Hospital not found",
+      });
+    }
+
+    // Hospital must be online
+    if (hospital.status !== "online") {
+      return res.status(400).json({
+        success: false,
+        message: "Hospital is currently offline",
+      });
+    }
+
+    // Hospital must have location
+    if (
+      hospital.locationSet !== true ||
+      hospital.latitude === null ||
+      hospital.longitude === null
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Hospital location is not available",
+      });
+    }
+
+    // Hospital must have available bed
+    if (hospital.availableBeds <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Hospital has no available emergency beds",
+      });
+    }
+
+    emergency.hospital = hospital._id;
+    emergency.status = "Hospital Assigned";
+
+    await emergency.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Hospital assigned successfully",
+      emergency,
+    });
+
+  } catch (error) {
+    console.error(
+      "Assign Hospital Error:",
+      error
+    );
+
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
