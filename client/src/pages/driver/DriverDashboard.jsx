@@ -5,10 +5,12 @@ import { io } from "socket.io-client";
 
 import { logoutDriver } from "../../services/authService.js";
 import { useAuth } from "../../context/AuthContext";
-
+import "./DriverDashboard.css";
 import {
   getDriverRequests,
   updateEmergencyStatus,
+  getNearestHospitals,
+  assignHospital,
 } from "../../services/emergencyService";
 
 import { updateDriverLocation } from "../../services/driverService";
@@ -30,7 +32,13 @@ import NavigationIcon from "@mui/icons-material/Navigation";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
-
+import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
+import HotelIcon from "@mui/icons-material/Hotel";
+import CallIcon from "@mui/icons-material/Call";
+import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import BedIcon from "@mui/icons-material/Bed";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 function DriverDashboard() {
 
@@ -61,7 +69,15 @@ function DriverDashboard() {
   const navigate = useNavigate();
 
   const { user, logout } = useAuth();
+   const [hospitals, setHospitals] = useState([]);
+const [hospitalLoading, setHospitalLoading] =
+  useState(false);
 
+const [selectedRequest, setSelectedRequest] =
+  useState(null);
+
+const [assigningHospital, setAssigningHospital] =
+  useState(null);
 
   // =========================================
   // LOGOUT
@@ -93,9 +109,83 @@ function DriverDashboard() {
   };
 
 
-  // =========================================
-  // FETCH REQUESTS
-  // =========================================
+  const fetchNearestHospitals = async (requestId) => {
+  try {
+    setHospitalLoading(true);
+    setSelectedRequest(requestId);
+
+    const response =
+      await getNearestHospitals(requestId);
+
+    setHospitals(
+      (response.hospitals || []).sort(
+        (a, b) => a.distance - b.distance
+      )
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast.error(
+      error.response?.data?.message ||
+      "Failed to load nearby hospitals"
+    );
+
+  } finally {
+
+    setHospitalLoading(false);
+
+  }
+};
+
+  const handleAssignHospital = async (
+  hospitalId
+) => {
+
+  if (!selectedRequest) {
+    toast.error(
+      "Please select an emergency request"
+    );
+    return;
+  }
+
+  try {
+
+    setAssigningHospital(hospitalId);
+
+    const response =
+      await assignHospital(
+        selectedRequest,
+        hospitalId
+      );
+
+    toast.success(
+      response.message ||
+      "Hospital requested successfully"
+    );
+
+    await fetchRequests();
+
+    setHospitals([]);
+
+    setSelectedRequest(null);
+
+  } catch (error) {
+
+    toast.error(
+      error.response?.data?.message ||
+      "Failed to request hospital"
+    );
+
+  } finally {
+
+    setAssigningHospital(null);
+
+  }
+}; 
+
+
 
   const fetchRequests = async () => {
 
@@ -254,7 +344,7 @@ function DriverDashboard() {
       async (data) => {
 
         console.log(
-          "🚨 NEW EMERGENCY:",
+          " NEW EMERGENCY:",
           data
         );
 
@@ -265,7 +355,7 @@ function DriverDashboard() {
         }
 
         toast.error(
-          `🚨 NEW EMERGENCY: ${
+          ` NEW EMERGENCY: ${
             data?.emergencyType ||
             "Emergency request"
           }`,
@@ -442,40 +532,46 @@ function DriverDashboard() {
   // =========================================
 
   const handleStatusUpdate = async (
-    requestId,
-    status
-  ) => {
+  requestId,
+  status
+) => {
 
-    try {
+  try {
 
-      setUpdating(requestId);
+    setUpdating(requestId);
 
-      const response =
-        await updateEmergencyStatus({
-          requestId,
-          status,
-        });
+    const response =
+      await updateEmergencyStatus({
+        requestId,
+        status,
+      });
 
-      toast.success(
-        response.message
+    toast.success(
+      response.message
+    );
+
+    await fetchRequests();
+
+    // Patient is now inside ambulance
+    if (status === "Patient Picked") {
+      await fetchNearestHospitals(
+        requestId
       );
-
-      await fetchRequests();
-
-    } catch (error) {
-
-      toast.error(
-        error.response?.data?.message ||
-        "Failed to update status"
-      );
-
-    } finally {
-
-      setUpdating(null);
-
     }
 
-  };
+  } catch (error) {
+
+    toast.error(
+      error.response?.data?.message ||
+      "Failed to update status"
+    );
+
+  } finally {
+
+    setUpdating(null);
+
+  }
+};
 
 
   // =========================================
@@ -491,10 +587,9 @@ function DriverDashboard() {
   const activeRequests =
     requests.filter(
       request =>
-        request.status ===
-          "Driver Arrived" ||
-        request.status ===
-          "Patient Picked"
+        request.status === "Driver Arrived" ||
+      request.status === "Patient Picked" ||
+      request.status === "Hospital Assigned"
     );
 
   const completedRequests =
@@ -572,374 +667,178 @@ function DriverDashboard() {
         </span>
       );
 
-    }
+    }}
+    // =========================================
+// ACTION BUTTON
+// =========================================
+
+const getActionButton = (request) => {
+
+  // -----------------------------
+  // NEW REQUEST
+  // -----------------------------
+  if (request.status === "Accepted") {
 
     return (
-      <span className="badge bg-secondary px-3 py-2">
-        {status}
-      </span>
-    );
-
-  };
-
-
-  // =========================================
-  // ACTION BUTTON
-  // =========================================
-
-  const getActionButton = (
-    request
-  ) => {
-
-    if (
-      request.status ===
-      "Accepted"
-    ) {
-
-      return (
-        <button
-          className="btn btn-primary w-100"
-          disabled={
-            updating === request._id
-          }
-          onClick={() =>
-            handleStatusUpdate(
-              request._id,
-              "Driver Arrived"
-            )
-          }
-        >
-
-          <NavigationIcon
-            style={{
-              fontSize: 18,
-              marginRight: 5,
-            }}
-          />
-
-          {updating === request._id
-            ? "Updating..."
-            : "Driver Arrived"}
-
-        </button>
-      );
-
-    }
-
-    if (
-      request.status ===
-      "Driver Arrived"
-    ) {
-
-      return (
-        <button
-          className="btn btn-warning w-100"
-          disabled={
-            updating === request._id
-          }
-          onClick={() =>
-            handleStatusUpdate(
-              request._id,
-              "Patient Picked"
-            )
-          }
-        >
-
-          <PersonIcon
-            style={{
-              fontSize: 18,
-              marginRight: 5,
-            }}
-          />
-
-          {updating === request._id
-            ? "Updating..."
-            : "Patient Picked"}
-
-        </button>
-      );
-
-    }
-
-    if (
-      request.status ===
-      "Patient Picked"
-    ) {
-
-      return (
-        <button
-          className="btn btn-success w-100"
-          disabled={
-            updating === request._id
-          }
-          onClick={() =>
-            handleStatusUpdate(
-              request._id,
-              "Completed"
-            )
-          }
-        >
-
-          <CheckCircleIcon
-            style={{
-              fontSize: 18,
-              marginRight: 5,
-            }}
-          />
-
-          {updating === request._id
-            ? "Updating..."
-            : "Complete"}
-
-        </button>
-      );
-
-    }
-
-    return (
-      <span className="text-muted">
-        No action
-      </span>
-    );
-
-  };
-
-
-  // =========================================
-  // LOADING
-  // =========================================
-
-  if (loading) {
-
-    return (
-      <div className="container py-5 text-center">
-
-        <div
-          className="spinner-border text-primary"
+      <button
+        className="btn btn-primary w-100"
+        disabled={updating === request._id}
+        onClick={() =>
+          handleStatusUpdate(
+            request._id,
+            "Driver Arrived"
+          )
+        }
+      >
+        <NavigationIcon
           style={{
-            width: 45,
-            height: 45,
+            fontSize: 18,
+            marginRight: 5,
           }}
         />
 
-        <p className="text-muted mt-3">
-          Loading driver dashboard...
-        </p>
-
-      </div>
+        {updating === request._id
+          ? "Updating..."
+          : "Driver Arrived"}
+      </button>
     );
-
   }
 
+  // -----------------------------
+  // DRIVER ARRIVED
+  // -----------------------------
+  if (request.status === "Driver Arrived") {
 
-  // =========================================
-  // UI
-  // =========================================
+    return (
+      <button
+        className="btn btn-warning w-100"
+        disabled={updating === request._id}
+        onClick={() =>
+          handleStatusUpdate(
+            request._id,
+            "Patient Picked"
+          )
+        }
+      >
+        <PersonIcon
+          style={{
+            fontSize: 18,
+            marginRight: 5,
+          }}
+        />
+
+        {updating === request._id
+          ? "Updating..."
+          : "Patient Picked"}
+      </button>
+    );
+  }
+
+  // -----------------------------
+  // PATIENT PICKED
+  // -----------------------------
+ if (request.status === "Patient Picked") {
 
   return (
-
-    <div
-      className="container-fluid py-4"
-      style={{
-        backgroundColor: "#f5f7fb",
-        minHeight: "100vh",
-      }}
+    <button
+      className="btn btn-outline-primary w-100"
+      onClick={() =>
+        fetchNearestHospitals(request._id)
+      }
     >
+      <LocalHospitalIcon
+        style={{
+          fontSize: 18,
+          marginRight: 5,
+        }}
+      />
 
-      <div className="container">
+      Find Nearby Hospitals
+    </button>
+  );
+}
+
+if (request.status === "Hospital Assigned") {
+
+  return (
+    <button
+      className="btn btn-success w-100"
+      disabled={updating === request._id}
+      onClick={() =>
+        handleStatusUpdate(
+          request._id,
+          "Completed"
+        )
+      }
+    >
+      <CheckCircleIcon
+        style={{
+          fontSize: 18,
+          marginRight: 5,
+        }}
+      />
+
+      {updating === request._id
+        ? "Completing..."
+        : "Complete Emergency"}
+    </button>
+  );
+}
+
+
+
+  return (
+    <span className="text-muted">
+      No action available
+    </span>
+  );
+};
+
+   return (
+
+  <div className="driver-dashboard">
+
+    {/* =========================================
+        BACKGROUND
+    ========================================= */}
+
+    <div className="driver-background" />
+
+    <div className="driver-overlay" />
+
+
+    <div className="driver-content">
+
+      <div className="container-fluid px-lg-5 py-4">
 
 
         {/* =====================================
             HEADER
         ===================================== */}
 
-        <div
-          className="card border-0 shadow-sm mb-4"
-          style={{
-            borderRadius: 16,
-          }}
-        >
+        <div className="driver-header mb-4">
 
-          <div className="card-body p-4">
+          <div className="driver-brand">
 
-            <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-
-              <div className="d-flex align-items-center gap-3">
-
-                <div
-                  className="rounded-circle d-flex align-items-center justify-content-center"
-                  style={{
-                    width: 60,
-                    height: 60,
-                    backgroundColor: "#e8f1ff",
-                  }}
-                >
-
-                  <LocalShippingIcon
-                    style={{
-                      fontSize: 34,
-                    }}
-                    color="primary"
-                  />
-
-                </div>
-
-                <div>
-
-                  <h2 className="fw-bold mb-1">
-                    Driver Dashboard
-                  </h2>
-
-                  <p className="text-muted mb-0">
-                    Welcome,{" "}
-                    <strong>
-                      {user?.fullName ||
-                        "Driver"}
-                    </strong>
-                  </p>
-
-                </div>
-
-              </div>
-
-
-              <div className="d-flex align-items-center gap-2 flex-wrap">
-
-                <span className="badge bg-success px-3 py-2">
-                  <span
-                    style={{
-                      fontSize: 12,
-                    }}
-                  >
-                    ●
-                  </span>{" "}
-                  ONLINE
-                </span>
-
-
-                {!soundEnabled && (
-
-                  <button
-                    className="btn btn-danger"
-                    onClick={async () => {
-
-                      await playEmergencySound();
-
-                      setSoundEnabled(
-                        true
-                      );
-
-                      toast.success(
-                        "Emergency alerts enabled"
-                      );
-
-                    }}
-                  >
-
-                    <NotificationsActiveIcon
-                      style={{
-                        fontSize: 19,
-                        marginRight: 5,
-                      }}
-                    />
-
-                    Enable Alerts
-
-                  </button>
-
-                )}
-
-
-                {soundEnabled && (
-
-                  <span className="badge bg-success px-3 py-2">
-
-                    <NotificationsActiveIcon
-                      style={{
-                        fontSize: 17,
-                        marginRight: 4,
-                      }}
-                    />
-
-                    Alerts ON
-
-                  </span>
-
-                )}
-
-
-                <button
-                  className="btn btn-outline-danger"
-                  onClick={
-                    handleLogout
-                  }
-                >
-
-                  <PowerSettingsNewIcon
-                    style={{
-                      fontSize: 18,
-                      marginRight: 5,
-                    }}
-                  />
-
-                  Logout
-
-                </button>
-
-              </div>
-
+            <div className="driver-logo">
+              <LocalShippingIcon />
             </div>
 
-          </div>
+            <div>
 
-        </div>
+              <div className="small text-white-50">
+                EMERGENCY RESPONSE CENTER
+              </div>
 
+              <h2 className="text-white fw-bold mb-0">
+                Driver Dashboard
+              </h2>
 
-        {/* =====================================
-            STAT CARDS
-        ===================================== */}
-
-        <div className="row g-3 mb-4">
-
-
-          {/* NEW */}
-
-          <div className="col-md-4">
-
-            <div
-              className="card border-0 shadow-sm h-100"
-              style={{
-                borderRadius: 16,
-                borderLeft:
-                  "5px solid #dc3545",
-              }}
-            >
-
-              <div className="card-body">
-
-                <div className="d-flex justify-content-between">
-
-                  <div>
-
-                    <p className="text-muted mb-1">
-                      New Requests
-                    </p>
-
-                    <h2 className="fw-bold text-danger mb-0">
-                      {newRequests.length}
-                    </h2>
-
-                  </div>
-
-                  <EmergencyIcon
-                    color="error"
-                    style={{
-                      fontSize: 42,
-                    }}
-                  />
-
-                </div>
-
+              <div className="text-white-50">
+                Welcome,{" "}
+                <strong>
+                  {user?.fullName || "Driver"}
+                </strong>
               </div>
 
             </div>
@@ -947,152 +846,220 @@ function DriverDashboard() {
           </div>
 
 
-          {/* ACTIVE */}
+          <div className="driver-header-actions">
 
-          <div className="col-md-4">
+            <span className="driver-online">
 
-            <div
-              className="card border-0 shadow-sm h-100"
-              style={{
-                borderRadius: 16,
-                borderLeft:
-                  "5px solid #ffc107",
-              }}
-            >
+              <span className="online-dot" />
 
-              <div className="card-body">
+              ONLINE
 
-                <div className="d-flex justify-content-between">
-
-                  <div>
-
-                    <p className="text-muted mb-1">
-                      Active Emergency
-                    </p>
-
-                    <h2 className="fw-bold text-warning mb-0">
-                      {activeRequests.length}
-                    </h2>
-
-                  </div>
-
-                  <PendingActionsIcon
-                    color="warning"
-                    style={{
-                      fontSize: 42,
-                    }}
-                  />
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
+            </span>
 
 
-          {/* COMPLETED */}
+            {!soundEnabled ? (
 
-          <div className="col-md-4">
+              <button
+                className="btn btn-danger alert-button"
+                onClick={async () => {
 
-            <div
-              className="card border-0 shadow-sm h-100"
-              style={{
-                borderRadius: 16,
-                borderLeft:
-                  "5px solid #198754",
-              }}
-            >
+                  await playEmergencySound();
 
-              <div className="card-body">
+                  setSoundEnabled(true);
 
-                <div className="d-flex justify-content-between">
+                  toast.success(
+                    "Emergency alerts enabled"
+                  );
 
-                  <div>
-
-                    <p className="text-muted mb-1">
-                      Completed
-                    </p>
-
-                    <h2 className="fw-bold text-success mb-0">
-                      {completedRequests.length}
-                    </h2>
-
-                  </div>
-
-                  <CheckCircleIcon
-                    color="success"
-                    style={{
-                      fontSize: 42,
-                    }}
-                  />
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-        {/* =====================================
-            CURRENT LOCATION
-        ===================================== */}
-
-        <div
-          className="card border-0 shadow-sm mb-4"
-          style={{
-            borderRadius: 16,
-          }}
-        >
-
-          <div className="card-body p-4">
-
-            <div className="d-flex align-items-start gap-3">
-
-              <LocationOnIcon
-                color="error"
-                style={{
-                  fontSize: 35,
                 }}
-              />
+              >
+
+                <NotificationsActiveIcon />
+
+                Enable Alerts
+
+              </button>
+
+            ) : (
+
+              <span className="alerts-active">
+
+                <NotificationsActiveIcon />
+
+                Alerts ON
+
+              </span>
+
+            )}
+
+
+            <button
+              className="btn btn-light"
+              onClick={handleLogout}
+            >
+
+              <PowerSettingsNewIcon />
+
+              Logout
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+
+        {/* =====================================
+            HERO
+        ===================================== */}
+
+        <div className="driver-hero mb-4">
+
+          <div className="driver-hero-content">
+
+            <div className="hero-badge">
+
+              <WarningAmberIcon />
+
+              Emergency Response Active
+
+            </div>
+
+            <h1>
+              Save lives.
+              <br />
+              <span>Respond faster.</span>
+            </h1>
+
+            <p>
+              Monitor emergency requests,
+              navigate to patients and find
+              the nearest available hospital.
+            </p>
+
+          </div>
+
+
+          <div className="hero-ambulance">
+
+            <LocalShippingIcon />
+
+          </div>
+
+        </div>
+
+
+
+        {/* =====================================
+            STATISTICS
+        ===================================== */}
+
+        <div className="row g-4 mb-4">
+
+
+          <div className="col-xl-3 col-md-6">
+
+            <div className="driver-stat-card danger">
 
               <div>
 
-                <h5 className="fw-bold mb-1">
-                  Current Location
-                </h5>
+                <span>
+                  New Requests
+                </span>
 
-                <div className="text-muted">
-                  {currentAddress}
-                </div>
+                <h2>
+                  {newRequests.length}
+                </h2>
 
-                {currentLatitude !== null &&
-                  currentLongitude !== null && (
-
-                  <small className="text-muted">
-
-                    Lat:{" "}
-                    {currentLatitude.toFixed(
-                      6
-                    )}
-
-                    {" • "}
-
-                    Long:{" "}
-                    {currentLongitude.toFixed(
-                      6
-                    )}
-
-                  </small>
-
-                )}
+                <small>
+                  Emergency cases
+                </small>
 
               </div>
+
+              <EmergencyIcon />
+
+            </div>
+
+          </div>
+
+
+          <div className="col-xl-3 col-md-6">
+
+            <div className="driver-stat-card warning">
+
+              <div>
+
+                <span>
+                  Active Emergency
+                </span>
+
+                <h2>
+                  {activeRequests.length}
+                </h2>
+
+                <small>
+                  Currently handling
+                </small>
+
+              </div>
+
+              <PendingActionsIcon />
+
+            </div>
+
+          </div>
+
+
+          <div className="col-xl-3 col-md-6">
+
+            <div className="driver-stat-card success">
+
+              <div>
+
+                <span>
+                  Completed
+                </span>
+
+                <h2>
+                  {completedRequests.length}
+                </h2>
+
+                <small>
+                  Successfully completed
+                </small>
+
+              </div>
+
+              <CheckCircleIcon />
+
+            </div>
+
+          </div>
+
+
+          <div className="col-xl-3 col-md-6">
+
+            <div className="driver-stat-card primary">
+
+              <div>
+
+                <span>
+                  Nearby Hospitals
+                </span>
+
+                <h2>
+                  {hospitals.length}
+                </h2>
+
+                <small>
+                  Emergency facilities
+                </small>
+
+              </div>
+
+              <LocalHospitalIcon />
 
             </div>
 
@@ -1101,128 +1068,217 @@ function DriverDashboard() {
         </div>
 
 
+
         {/* =====================================
-            NEW EMERGENCY
+            LOCATION
+        ===================================== */}
+
+        <div className="glass-card mb-4">
+
+          <div className="location-header">
+
+            <div className="location-icon">
+
+              <LocationOnIcon />
+
+            </div>
+
+            <div>
+
+              <small>
+                LIVE LOCATION
+              </small>
+
+              <h5 className="mb-1 fw-bold">
+                Current Ambulance Location
+              </h5>
+
+              <p className="text-muted mb-0">
+                {currentAddress}
+              </p>
+
+            </div>
+
+            <div className="ms-auto location-live">
+
+              <span />
+
+              GPS ACTIVE
+
+            </div>
+
+          </div>
+
+
+          {currentLatitude !== null && (
+
+            <div className="coordinates">
+
+              <div>
+
+                <small>
+                  LATITUDE
+                </small>
+
+                <strong>
+                  {currentLatitude.toFixed(6)}
+                </strong>
+
+              </div>
+
+              <div>
+
+                <small>
+                  LONGITUDE
+                </small>
+
+                <strong>
+                  {currentLongitude.toFixed(6)}
+                </strong>
+
+              </div>
+
+            </div>
+
+          )}
+
+        </div>
+
+
+
+        {/* =====================================
+            NEW EMERGENCIES
         ===================================== */}
 
         {newRequests.length > 0 && (
 
-          <div className="mb-4">
+          <section className="dashboard-section">
 
-            <div className="d-flex align-items-center gap-2 mb-3">
+            <div className="section-title">
 
-              <EmergencyIcon
-                color="error"
-              />
+              <div className="section-title-icon danger-icon">
 
-              <h4 className="fw-bold mb-0 text-danger">
-                New Emergency Requests
-              </h4>
+                <EmergencyIcon />
+
+              </div>
+
+              <div>
+
+                <h4>
+                  New Emergency Requests
+                </h4>
+
+                <p>
+                  Immediate response required
+                </p>
+
+              </div>
+
+              <span className="section-count danger-count">
+                {newRequests.length}
+              </span>
 
             </div>
 
 
-            <div className="row g-3">
+            <div className="row g-4">
 
               {newRequests.map(
                 request => (
 
                   <div
-                    className="col-lg-6"
+                    className="col-xl-6"
                     key={request._id}
                   >
 
-                    <div
-                      className="card border-danger shadow-sm h-100"
-                      style={{
-                        borderRadius: 16,
-                        borderWidth: 2,
-                      }}
-                    >
+                    <div className="emergency-card new-card">
 
-                      <div className="card-body p-4">
+                      <div className="emergency-card-top">
 
-                        <div className="d-flex justify-content-between align-items-start mb-3">
+                        <div className="emergency-type">
+
+                          <div className="emergency-icon">
+
+                            <EmergencyIcon />
+
+                          </div>
 
                           <div>
 
-                            <h5 className="fw-bold mb-1">
-
-                              <MedicalServicesIcon
-                                style={{
-                                  marginRight: 5,
-                                }}
-                              />
-
+                            <h5>
                               {request.emergencyType ||
                                 "Emergency"}
-
                             </h5>
 
-                            <small className="text-muted">
-                              New emergency request
+                            <small>
+                              Request #
+                              {request._id.slice(-6)}
                             </small>
 
                           </div>
 
-                          {getStatusBadge(
-                            request.status
-                          )}
-
                         </div>
 
+                        {getStatusBadge(
+                          request.status
+                        )}
 
-                        <div className="mb-2">
+                      </div>
 
-                          <PersonIcon
-                            style={{
-                              fontSize: 19,
-                              marginRight: 8,
-                            }}
-                          />
 
-                          <strong>
+                      <div className="emergency-details">
+
+                        <div>
+
+                          <PersonIcon />
+
+                          <span>
                             {request.patient
                               ?.fullName ||
                               "Unknown Patient"}
-                          </strong>
+                          </span>
 
                         </div>
 
 
-                        <div className="mb-2">
+                        <div>
 
-                          <PhoneIcon
-                            style={{
-                              fontSize: 19,
-                              marginRight: 8,
-                            }}
-                          />
+                          <PhoneIcon />
 
-                          {request.patient
-                            ?.phone ||
-                            "N/A"}
+                          <span>
+                            {request.patient
+                              ?.phone ||
+                              "N/A"}
+                          </span>
 
                         </div>
 
 
-                        <div className="mb-3">
+                        <div className="full-width">
 
-                          <LocationOnIcon
-                            color="error"
-                            style={{
-                              fontSize: 20,
-                              marginRight: 8,
-                            }}
-                          />
+                          <LocationOnIcon />
 
-                          {request.pickupAddress ||
-                            "Pickup location unavailable"}
+                          <span>
+                            {request.pickupAddress ||
+                              "Pickup location unavailable"}
+                          </span>
 
                         </div>
 
+                      </div>
 
-                        <div className="d-flex gap-2">
+
+                      <div className="emergency-footer">
+
+                        <AccessTimeIcon />
+
+                        <span>
+                          {new Date(
+                            request.createdAt
+                          ).toLocaleString()}
+                        </span>
+
+                        <div className="ms-auto">
 
                           {getActionButton(
                             request
@@ -1241,136 +1297,195 @@ function DriverDashboard() {
 
             </div>
 
-          </div>
+          </section>
 
         )}
+
 
 
         {/* =====================================
             ACTIVE EMERGENCIES
         ===================================== */}
 
-        <div className="mb-4">
+        <section className="dashboard-section">
 
-          <div className="d-flex align-items-center gap-2 mb-3">
+          <div className="section-title">
 
-            <PendingActionsIcon
-              color="warning"
-            />
+            <div className="section-title-icon warning-icon">
 
-            <h4 className="fw-bold mb-0">
-              Active Emergencies
-            </h4>
+              <PendingActionsIcon />
+
+            </div>
+
+            <div>
+
+              <h4>
+                Active Emergency
+              </h4>
+
+              <p>
+                Current patient transportation
+              </p>
+
+            </div>
+
+         <div className="d-flex align-items-center gap-2">
+
+  <span className="section-count warning-count">
+    {activeRequests.length}
+  </span>
+
+  <button
+    type="button"
+    className="refresh-request-button"
+    onClick={fetchRequests}
+    disabled={loading}
+    title="Refresh emergency requests"
+  >
+    <RefreshIcon
+      className={loading ? "spin" : ""}
+    />
+  </button>
+
+</div>
 
           </div>
 
 
           {activeRequests.length === 0 ? (
 
-            <div
-              className="card border-0 shadow-sm"
-              style={{
-                borderRadius: 16,
-              }}
-            >
+            <div className="empty-card">
 
-              <div className="card-body text-center py-4">
+              <PendingActionsIcon />
 
-                <PendingActionsIcon
-                  style={{
-                    fontSize: 45,
-                    color: "#adb5bd",
-                  }}
-                />
+              <h5>
+                No Active Emergency
+              </h5>
 
-                <p className="text-muted mt-2 mb-0">
-                  No active emergency
-                  requests
-                </p>
-
-              </div>
+              <p>
+                Active patient transportation
+                will appear here.
+              </p>
 
             </div>
 
           ) : (
 
-            <div className="row g-3">
+            <div className="row g-4">
 
               {activeRequests.map(
                 request => (
 
                   <div
-                    className="col-lg-6"
+                    className="col-xl-6"
                     key={request._id}
                   >
 
-                    <div
-                      className="card border-0 shadow-sm h-100"
-                      style={{
-                        borderRadius: 16,
-                      }}
-                    >
+                    <div className="emergency-card active-card">
 
-                      <div className="card-body p-4">
+                      <div className="emergency-card-top">
 
-                        <div className="d-flex justify-content-between mb-3">
+                        <div className="emergency-type">
 
-                          <h5 className="fw-bold">
+                          <div className="emergency-icon blue">
 
-                            <LocalShippingIcon
-                              color="primary"
-                              style={{
-                                marginRight: 7,
-                              }}
-                            />
+                            <LocalShippingIcon />
 
-                            {request.emergencyType ||
-                              "Emergency"}
+                          </div>
 
-                          </h5>
+                          <div>
 
-                          {getStatusBadge(
-                            request.status
-                          )}
+                            <h5>
+                              {request.emergencyType}
+                            </h5>
+
+                            <small>
+                              Patient transportation
+                            </small>
+
+                          </div>
+
+                        </div>
+
+                        {getStatusBadge(
+                          request.status
+                        )}
+
+                      </div>
+
+
+                      <div className="emergency-details">
+
+                        <div>
+
+                          <PersonIcon />
+
+                          <span>
+                            {request.patient
+                              ?.fullName ||
+                              "N/A"}
+                          </span>
 
                         </div>
 
 
-                        <p className="mb-2">
+                        <div>
 
-                          <PersonIcon
-                            style={{
-                              marginRight: 7,
-                            }}
-                          />
+                          <PhoneIcon />
 
-                          {request.patient
-                            ?.fullName ||
-                            "N/A"}
+                          <span>
+                            {request.patient
+                              ?.phone ||
+                              "N/A"}
+                          </span>
 
-                        </p>
+                        </div>
 
 
-                        <p className="mb-3">
+                        <div className="full-width">
 
-                          <LocationOnIcon
-                            color="error"
-                            style={{
-                              marginRight: 7,
-                            }}
-                          />
+                          <LocationOnIcon />
 
-                          {request.pickupAddress ||
-                            "N/A"}
+                          <span>
+                            {request.pickupAddress ||
+                              "N/A"}
+                          </span>
 
-                        </p>
+                        </div>
 
+                      </div>
+
+
+                      <div className="mt-3">
 
                         {getActionButton(
                           request
                         )}
 
                       </div>
+
+
+                      {/* FIND HOSPITAL */}
+
+                      {request.status ===
+                        "Patient Picked" && (
+
+                        <button
+                          className="find-hospital-button mt-3"
+                          onClick={() =>
+                            fetchNearestHospitals(
+                              request._id
+                            )
+                          }
+                        >
+
+                          <LocalHospitalIcon />
+
+                          Find Nearby Hospitals
+
+                        </button>
+
+                      )}
 
                     </div>
 
@@ -1383,194 +1498,477 @@ function DriverDashboard() {
 
           )}
 
-        </div>
+        </section>
+
 
 
         {/* =====================================
-            COMPLETED REQUESTS
+            AVAILABLE HOSPITALS
         ===================================== */}
 
-        <div className="mb-4">
+        <section className="dashboard-section">
 
-          <div className="d-flex align-items-center gap-2 mb-3">
+          <div className="section-title">
 
-            <CheckCircleIcon
-              color="success"
-            />
+            <div className="section-title-icon hospital-icon">
 
-            <h4 className="fw-bold mb-0">
-              Completed Requests
-            </h4>
+              <LocalHospitalIcon />
+
+            </div>
+
+            <div>
+
+              <h4>
+                Available Hospitals
+              </h4>
+
+              <p>
+                Nearest emergency hospitals
+                sorted by distance
+              </p>
+
+            </div>
+
+            {hospitals.length > 0 && (
+
+              <span className="section-count hospital-count">
+
+                {hospitals.length}
+
+              </span>
+
+            )}
 
           </div>
 
 
-          <div
-            className="card border-0 shadow-sm"
-            style={{
-              borderRadius: 16,
-            }}
-          >
+          {hospitalLoading ? (
 
-            <div className="card-body p-0">
+            <div className="empty-card">
 
-              {completedRequests.length === 0 ? (
+              <RefreshIcon className="spin" />
 
-                <div className="text-center py-4">
+              <h5>
+                Finding Nearby Hospitals
+              </h5>
 
-                  <CheckCircleIcon
-                    style={{
-                      fontSize: 45,
-                      color: "#adb5bd",
-                    }}
-                  />
+              <p>
+                Checking emergency beds and
+                hospital availability...
+              </p>
 
-                  <p className="text-muted mt-2">
-                    No completed requests yet.
-                  </p>
+            </div>
 
-                </div>
+          ) : hospitals.length === 0 ? (
 
-              ) : (
+            <div className="empty-card">
 
-                <div className="table-responsive">
+              <LocalHospitalIcon />
 
-                  <table className="table table-hover align-middle mb-0">
+              <h5>
+                No Hospital Selected
+              </h5>
 
-                    <thead className="table-light">
+              <p>
+                After picking up a patient,
+                find nearby hospitals here.
+              </p>
 
-                      <tr>
+            </div>
 
-                        <th>
-                          Patient
-                        </th>
+          ) : (
 
-                        <th>
-                          Emergency
-                        </th>
+            <div className="row g-4">
 
-                        <th>
-                          Pickup
-                        </th>
+              {hospitals.map(
+                (hospital, index) => (
 
-                        <th>
-                          Status
-                        </th>
+                  <div
+                    className="col-xl-4 col-lg-6"
+                    key={hospital._id}
+                  >
 
-                      </tr>
+                    <div className="hospital-card">
 
-                    </thead>
+                      {/* RANK */}
 
+                      <div className="hospital-rank">
 
-                    <tbody>
+                        #{index + 1}
 
-                      {completedRequests.map(
-                        request => (
-
-                          <tr
-                            key={
-                              request._id
-                            }
-                          >
-
-                            <td>
-
-                              <PersonIcon
-                                style={{
-                                  fontSize: 18,
-                                  marginRight: 6,
-                                }}
-                              />
-
-                              {request.patient
-                                ?.fullName ||
-                                "N/A"}
-
-                            </td>
+                      </div>
 
 
-                            <td>
+                      {/* HEADER */}
 
-                              {request.emergencyType ||
-                                "N/A"}
+                      <div className="hospital-card-header">
 
-                            </td>
+                        <div className="hospital-logo-small">
+
+                          <LocalHospitalIcon />
+
+                        </div>
+
+                        <div>
+
+                          <h5>
+                            {hospital.hospitalName}
+                          </h5>
+
+                          <small>
+                            {hospital.city}
+                          </small>
+
+                        </div>
+
+                      </div>
 
 
-                            <td>
+                      {/* DISTANCE */}
 
-                              <LocationOnIcon
-                                style={{
-                                  fontSize: 18,
-                                  marginRight: 5,
-                                }}
-                              />
+                      <div className="distance-box">
 
-                              {request.pickupAddress ||
-                                "N/A"}
+                        <div>
 
-                            </td>
+                          <NavigationIcon />
+
+                          <div>
+
+                            <small>
+                              DISTANCE
+                            </small>
+
+                            <strong>
+                              {hospital.distance}
+                              {" km"}
+                            </strong>
+
+                          </div>
+
+                        </div>
 
 
-                            <td>
+                        <span className="nearest-label">
 
-                              {getStatusBadge(
-                                request.status
-                              )}
+                          {index === 0
+                            ? "NEAREST"
+                            : `#${index + 1}`}
 
-                            </td>
+                        </span>
 
-                          </tr>
+                      </div>
 
-                        )
-                      )}
 
-                    </tbody>
+                      {/* BED STATUS */}
 
-                  </table>
+                      <div className="hospital-beds">
 
-                </div>
+                        <div>
 
+                          <BedIcon />
+
+                          <div>
+
+                            <small>
+                              Available Beds
+                            </small>
+
+                            <strong className="text-success">
+
+                              {hospital.availableBeds}
+
+                            </strong>
+
+                          </div>
+
+                        </div>
+
+
+                        <div>
+
+                          <HotelIcon />
+
+                          <div>
+
+                            <small>
+                              Emergency Beds
+                            </small>
+
+                            <strong>
+
+                              {hospital.emergencyBeds}
+
+                            </strong>
+
+                          </div>
+
+                        </div>
+
+                      </div>
+
+
+                      {/* INFO */}
+
+                      <div className="hospital-info">
+
+                        <div>
+
+                          <LocationOnIcon />
+
+                          <span>
+                            {hospital.address ||
+                              "Address unavailable"}
+                          </span>
+
+                        </div>
+
+
+                        <div>
+
+                          <CallIcon />
+
+                          <span>
+                            {hospital.phone ||
+                              "Phone unavailable"}
+                          </span>
+
+                        </div>
+
+                      </div>
+
+
+                      {/* ACTION */}
+
+                      <button
+                        className="request-hospital-btn"
+                        disabled={
+                          assigningHospital ===
+                          hospital._id
+                        }
+                        onClick={() =>
+                          handleAssignHospital(
+                            hospital._id
+                          )
+                        }
+                      >
+
+                        {assigningHospital ===
+                        hospital._id ? (
+
+                          <>
+                            <RefreshIcon className="spin" />
+
+                            Requesting...
+
+                          </>
+
+                        ) : (
+
+                          <>
+
+                            <LocalHospitalIcon />
+
+                            Request Hospital
+
+                          </>
+
+                        )}
+
+                      </button>
+
+                    </div>
+
+                  </div>
+
+                )
               )}
 
             </div>
 
-          </div>
+          )}
 
-        </div>
+        </section>
+
 
 
         {/* =====================================
-            TEST SOUND
+            COMPLETED
         ===================================== */}
 
-        <div className="text-center mt-4">
+        <section className="dashboard-section">
 
-          <button
-            className="btn btn-outline-danger"
-            onClick={
-              playEmergencySound
-            }
-          >
+          <div className="section-title">
 
-            <NotificationsActiveIcon
-              style={{
-                marginRight: 6,
-              }}
-            />
+            <div className="section-title-icon success-icon">
 
-            Test Emergency Sound
+              <CheckCircleIcon />
 
-          </button>
+            </div>
+
+            <div>
+
+              <h4>
+                Completed Requests
+              </h4>
+
+              <p>
+                Successfully completed emergencies
+              </p>
+
+            </div>
+
+            <span className="section-count success-count">
+
+              {completedRequests.length}
+
+            </span>
+
+          </div>
+
+
+          <div className="completed-card">
+
+            {completedRequests.length === 0 ? (
+
+              <div className="empty-card">
+
+                <CheckCircleIcon />
+
+                <h5>
+                  No Completed Requests
+                </h5>
+
+                <p>
+                  Completed emergencies will
+                  appear here.
+                </p>
+
+              </div>
+
+            ) : (
+
+              <div className="table-responsive">
+
+                <table className="table align-middle mb-0">
+
+                  <thead>
+
+                    <tr>
+
+                      <th>
+                        Patient
+                      </th>
+
+                      <th>
+                        Emergency
+                      </th>
+
+                      <th>
+                        Pickup
+                      </th>
+
+                      <th>
+                        Status
+                      </th>
+
+                    </tr>
+
+                  </thead>
+
+
+                  <tbody>
+
+                    {completedRequests.map(
+                      request => (
+
+                        <tr
+                          key={request._id}
+                        >
+
+                          <td>
+
+                            <PersonIcon />
+
+                            {request.patient
+                              ?.fullName ||
+                              "N/A"}
+
+                          </td>
+
+
+                          <td>
+
+                            {request.emergencyType}
+
+                          </td>
+
+
+                          <td>
+
+                            <LocationOnIcon />
+
+                            {request.pickupAddress}
+
+                          </td>
+
+
+                          <td>
+
+                            {getStatusBadge(
+                              request.status
+                            )}
+
+                          </td>
+
+                        </tr>
+
+                      )
+                    )}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            )}
+
+          </div>
+
+        </section>
+
+
+
+        {/* =====================================
+            FOOTER
+        ===================================== */}
+
+        <div className="driver-footer">
+
+          <div>
+
+            <LocalShippingIcon />
+
+            Emergency Response System
+
+          </div>
+
+          <span>
+            Driver Control Center
+          </span>
 
         </div>
+
 
       </div>
 
     </div>
 
-  );
+  </div>
+
+);
 
 }
+
 
 export default DriverDashboard;

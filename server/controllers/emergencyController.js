@@ -742,6 +742,7 @@ export const assignHospital = async (req, res) => {
       });
     }
 
+
     const emergency =
       await EmergencyRequest.findById(requestId);
 
@@ -752,6 +753,16 @@ export const assignHospital = async (req, res) => {
       });
     }
 
+
+    if (emergency.status !== "Patient Picked") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Hospital can only be selected after patient is picked",
+      });
+    }
+
+    
     if (emergency.hospital) {
       return res.status(400).json({
         success: false,
@@ -759,6 +770,7 @@ export const assignHospital = async (req, res) => {
       });
     }
 
+    
     const hospital =
       await Hospital.findById(hospitalId);
 
@@ -769,7 +781,8 @@ export const assignHospital = async (req, res) => {
       });
     }
 
-    // Hospital must be online
+    
+
     if (hospital.status !== "online") {
       return res.status(400).json({
         success: false,
@@ -777,7 +790,8 @@ export const assignHospital = async (req, res) => {
       });
     }
 
-    // Hospital must have location
+    
+
     if (
       hospital.locationSet !== true ||
       hospital.latitude === null ||
@@ -789,18 +803,23 @@ export const assignHospital = async (req, res) => {
       });
     }
 
-    // Hospital must have available bed
+    
+
     if (hospital.availableBeds <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Hospital has no available emergency beds",
+        message:
+          "Hospital has no available emergency beds",
       });
     }
+
 
     emergency.hospital = hospital._id;
     emergency.status = "Hospital Assigned";
 
     await emergency.save();
+
+  
 
     return res.status(200).json({
       success: true,
@@ -809,6 +828,7 @@ export const assignHospital = async (req, res) => {
     });
 
   } catch (error) {
+
     console.error(
       "Assign Hospital Error:",
       error

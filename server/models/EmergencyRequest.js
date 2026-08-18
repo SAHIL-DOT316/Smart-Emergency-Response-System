@@ -51,17 +51,20 @@ const emergencyRequestSchema = new mongoose.Schema(
     },
 
     status: {
-      type: String,
-      enum: [
-        "Pending",
-        "Accepted",
-        "Driver Arrived",
-        "Patient Picked",
-        "Completed",
-        "Cancelled",
-      ],
-      default: "Pending",
-    },
+  type: String,
+  enum: [
+    "Pending",
+    "Accepted",
+    "Driver Arrived",
+    "Patient Picked",
+    "Hospital Assigned",   
+    "Hospital Accepted",
+    "Patient Arrived",
+    "Completed",
+    "Cancelled",
+  ],
+  default: "Pending",
+},
   },
   {
     timestamps: true,
