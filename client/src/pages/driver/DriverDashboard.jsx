@@ -193,7 +193,8 @@ const [assigningHospital, setAssigningHospital] =
 
       const response =
         await getDriverRequests();
-
+   console.log("REFRESH RESPONSE:", response);
+console.log("ALL REQUESTS:", response.requests);
       setRequests(
         response.requests || []
       );
@@ -1150,7 +1151,6 @@ if (request.status === "Hospital Assigned") {
             NEW EMERGENCIES
         ===================================== */}
 
-        {newRequests.length > 0 && (
 
           <section className="dashboard-section">
 
@@ -1174,12 +1174,44 @@ if (request.status === "Hospital Assigned") {
 
               </div>
 
-              <span className="section-count danger-count">
-                {newRequests.length}
-              </span>
+             <div className="d-flex align-items-center gap-2">
+
+  <span className="section-count danger-count">
+    {newRequests.length}
+  </span>
+
+  <button
+    type="button"
+    className="refresh-request-button"
+    onClick={fetchRequests}
+    disabled={loading}
+    title="Refresh emergency requests"
+  >
+    <RefreshIcon
+      className={loading ? "spin" : ""}
+    />
+  </button>
+
+</div>
 
             </div>
+            {newRequests.length === 0 ? (
 
+  <div className="empty-card">
+
+    <EmergencyIcon />
+
+    <h5>
+      No New Emergency Requests
+    </h5>
+
+    <p>
+      New ambulance requests will appear here.
+    </p>
+
+  </div>
+
+) :(
 
             <div className="row g-4">
 
@@ -1293,14 +1325,13 @@ if (request.status === "Hospital Assigned") {
                   </div>
 
                 )
+              
               )}
-
+            
             </div>
-
+)}
           </section>
-
-        )}
-
+        
 
 
         {/* =====================================

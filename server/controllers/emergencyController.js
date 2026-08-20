@@ -97,6 +97,7 @@ export const createEmergencyRequest = async (req, res) => {
     emergency.status = "Accepted";
 
     await emergency.save();
+    
 
     // ==========================================
     // MAKE DRIVER BUSY
@@ -405,7 +406,7 @@ if (emergency.status !== "Pending") {
 export const getDriverRequests = async (req, res) => {
   try {
     const driverId = req.user.id;
-
+   
     const requests = await EmergencyRequest.find({
       driver: driverId,
     })
