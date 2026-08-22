@@ -1,3 +1,17 @@
+import LocationOnIcon from "@mui/icons-material/LocationOn";
+import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
+import EmergencyIcon from "@mui/icons-material/Emergency";
+import PersonIcon from "@mui/icons-material/Person";
+import PhoneIcon from "@mui/icons-material/Phone";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
+import MyLocationIcon from "@mui/icons-material/MyLocation";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import PendingIcon from "@mui/icons-material/Pending";
+import NavigationIcon from "@mui/icons-material/Navigation";
+import CloseIcon from "@mui/icons-material/Close";
+
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -12,6 +26,8 @@ import {
 import {
   getAddressFromCoordinates,
 } from "../../services/locationService";
+
+import "./patientDashboard.css";
 
 function PatientDashboard() {
   const [requests, setRequests] = useState([]);
@@ -32,337 +48,584 @@ function PatientDashboard() {
   const [requesting, setRequesting] =
     useState(false);
 
-  // ==============================
-  // Fetch Patient Requests
-  // ==============================
+  const [selectedRequest, setSelectedRequest] =
+    useState(null);
+
+  // =====================================================
+  // FETCH REQUESTS
+  // =====================================================
 
   const fetchRequests = async () => {
     try {
-      const response = await getMyEmergencyRequests();
+      const response =
+        await getMyEmergencyRequests();
 
-      setRequests(response.requests || []);
+      console.log(
+        "PATIENT REQUESTS:",
+        response
+      );
+
+      setRequests(
+        response.requests || []
+      );
+
     } catch (error) {
+      console.error(
+        "Request fetch error:",
+        error
+      );
+
       toast.error(
         error.response?.data?.message ||
           "Failed to load emergency requests"
       );
+
     } finally {
       setLoadingRequests(false);
     }
   };
 
-  // ==============================
-  // Fetch Available Drivers
-  // ==============================
+  // =====================================================
+  // FETCH AVAILABLE DRIVERS
+  // =====================================================
 
   const fetchDrivers = async () => {
     try {
-      const response = await getAvailableDrivers();
+      const response =
+        await getAvailableDrivers();
 
-      setDrivers(response.drivers || []);
+      console.log(
+        "AVAILABLE DRIVERS:",
+        response
+      );
+
+      setDrivers(
+        response.drivers || []
+      );
+
     } catch (error) {
+      console.error(
+        "Driver fetch error:",
+        error
+      );
+
       toast.error(
         error.response?.data?.message ||
           "Failed to load ambulances"
       );
+
     } finally {
       setLoadingDrivers(false);
     }
   };
 
-  // ==============================
-  // Initial Load
-  // ==============================
+  // =====================================================
+  // INITIAL LOAD
+  // =====================================================
 
   useEffect(() => {
     fetchRequests();
     fetchDrivers();
   }, []);
 
-  // ==============================
-  // Create Emergency Request
-  // ==============================
+  // =====================================================
+  // CREATE EMERGENCY REQUEST
+  // =====================================================
 
   const handleEmergencyRequest = () => {
-  if (!emergencyType) {
-    toast.error("Please select the type of emergency");
-    return;
-  }
 
-  if (!navigator.geolocation) {
-    toast.error(
-      "Geolocation is not supported by your browser."
-    );
-    return;
-  }
-
-  setRequesting(true);
-
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      try {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-
-        console.log("Patient Location:", {
-          latitude,
-          longitude,
-        });
-          const pickupAddress =
-  await getAddressFromCoordinates(
-    latitude,
-    longitude
-  );
-
-console.log("Pickup Address:", pickupAddress);
-        const response = await createEmergencyRequest({
-          pickupAddress: pickupAddress || "Current Location",
-          latitude,
-          longitude,
-          emergencyType: emergencyType,
-        });
-
-        console.log("Emergency Response:", response);
-
-        // Automatic nearest-driver assignment
-        toast.success(
-          response.driver
-            ? `Ambulance ${
-                response.driver.ambulanceNumber
-              } assigned. ${
-                response.driver.distance
-              } km away.`
-            : "Emergency request created. Waiting for an available ambulance."
-        );
-
-        setEmergencyType("");
-        setShowEmergencyModal(false);
-
-        await fetchRequests();
-        await fetchDrivers();
-
-      } catch (error) {
-        console.error(
-          "Emergency request error:",
-          error
-        );
-
-        toast.error(
-          error.response?.data?.message ||
-            "Failed to create emergency request"
-        );
-      } finally {
-        setRequesting(false);
-      }
-    },
-
-    (error) => {
-      setRequesting(false);
-
-      switch (error.code) {
-        case error.PERMISSION_DENIED:
-          toast.error(
-            "Location permission denied. Please allow location access."
-          );
-          break;
-
-        case error.POSITION_UNAVAILABLE:
-          toast.error(
-            "Unable to determine your current location."
-          );
-          break;
-
-        case error.TIMEOUT:
-          toast.error(
-            "Location request timed out."
-          );
-          break;
-
-        default:
-          toast.error(
-            "Unable to get your current location."
-          );
-      }
-    },
-
-    {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
+    if (!emergencyType) {
+      toast.error(
+        "Please select the type of emergency"
+      );
+      return;
     }
-  );
-};
-  // ==============================
-  // Status Badge
-  // ==============================
+
+    if (!navigator.geolocation) {
+      toast.error(
+        "Geolocation is not supported by your browser."
+      );
+      return;
+    }
+
+    setRequesting(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+
+        try {
+
+          const latitude =
+            position.coords.latitude;
+
+          const longitude =
+            position.coords.longitude;
+
+          console.log(
+            "Patient Location:",
+            {
+              latitude,
+              longitude,
+            }
+          );
+
+          // ---------------------------------------------
+          // GET ADDRESS
+          // ---------------------------------------------
+
+          let pickupAddress =
+            "Current Location";
+
+          try {
+
+            const address =
+              await getAddressFromCoordinates(
+                latitude,
+                longitude
+              );
+
+            if (address) {
+              pickupAddress = address;
+            }
+
+          } catch (addressError) {
+
+            console.warn(
+              "Address lookup failed:",
+              addressError
+            );
+
+          }
+
+          console.log(
+            "Pickup Address:",
+            pickupAddress
+          );
+
+          // ---------------------------------------------
+          // CREATE REQUEST
+          // ---------------------------------------------
+
+          const response =
+            await createEmergencyRequest({
+
+              pickupAddress,
+
+              latitude,
+
+              longitude,
+
+              emergencyType,
+
+            });
+
+          console.log(
+            "Emergency Response:",
+            response
+          );
+
+          // ---------------------------------------------
+          // SUCCESS MESSAGE
+          // ---------------------------------------------
+
+          if (response.driver) {
+
+            toast.success(
+              `Ambulance ${response.driver.ambulanceNumber} assigned`
+            );
+
+          } else {
+
+            toast.success(
+              "Emergency request created. Waiting for an available ambulance."
+            );
+
+          }
+
+          // ---------------------------------------------
+          // RESET
+          // ---------------------------------------------
+
+          setEmergencyType("");
+
+          setShowEmergencyModal(false);
+
+          await fetchRequests();
+
+          await fetchDrivers();
+
+        } catch (error) {
+
+          console.error(
+            "Emergency request error:",
+            error
+          );
+
+          toast.error(
+            error.response?.data?.message ||
+              "Failed to create emergency request"
+          );
+
+        } finally {
+
+          setRequesting(false);
+
+        }
+
+      },
+
+      (error) => {
+
+        setRequesting(false);
+
+        switch (error.code) {
+
+          case error.PERMISSION_DENIED:
+
+            toast.error(
+              "Location permission denied. Please allow location access."
+            );
+
+            break;
+
+          case error.POSITION_UNAVAILABLE:
+
+            toast.error(
+              "Unable to determine your current location."
+            );
+
+            break;
+
+          case error.TIMEOUT:
+
+            toast.error(
+              "Location request timed out."
+            );
+
+            break;
+
+          default:
+
+            toast.error(
+              "Unable to get your current location."
+            );
+        }
+      },
+
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  };
+
+  // =====================================================
+  // STATUS CLASS
+  // =====================================================
 
   const getStatusClass = (status) => {
+
     switch (status) {
+
       case "Pending":
-        return "bg-warning text-dark";
+        return "status-pending";
 
       case "Accepted":
-        return "bg-primary";
+        return "status-accepted";
 
       case "Driver Arrived":
-        return "bg-info text-dark";
+        return "status-arrived";
 
       case "Patient Picked":
-        return "bg-secondary";
+        return "status-picked";
+
+      case "Hospital Assigned":
+        return "status-hospital";
+
+      case "Hospital Accepted":
+        return "status-hospital";
 
       case "Completed":
-        return "bg-success";
+        return "status-completed";
 
       default:
-        return "bg-dark";
+        return "status-default";
     }
   };
 
-  // ==============================
-  // Close Modal
-  // ==============================
+  // =====================================================
+  // CLOSE MODAL
+  // =====================================================
 
   const closeModal = () => {
-    if (requesting) return;
+
+    if (requesting) {
+      return;
+    }
 
     setShowEmergencyModal(false);
+
     setEmergencyType("");
   };
 
-  // ==============================
+  // =====================================================
+  // ACTIVE REQUEST
+  // =====================================================
+
+  const activeRequest =
+    requests.find(
+      (request) =>
+        request.status === "Accepted" ||
+        request.status === "Driver Arrived" ||
+        request.status === "Patient Picked" ||
+        request.status === "Hospital Assigned" ||
+        request.status === "Hospital Accepted"
+    );
+
+  // =====================================================
+  // COMPLETED REQUESTS
+  // =====================================================
+
+  const completedRequests =
+    requests.filter(
+      (request) =>
+        request.status === "Completed"
+    );
+
+  // =====================================================
   // UI
-  // ==============================
+  // =====================================================
 
   return (
-    <>
+    <div className="patient-dashboard">
+
       <PatientNavbar />
 
-      <div className="container py-4">
+      <main className="patient-main">
 
-        {/* ========================================= */}
+        {/* ================================================= */}
         {/* HEADER */}
-        {/* ========================================= */}
+        {/* ================================================= */}
 
-        <div className="d-flex justify-content-between align-items-center mb-4">
+        <section className="patient-header">
 
           <div>
 
-            <h2 className="fw-bold mb-1">
-              Emergency Response
-            </h2>
+            <div className="patient-header-badge">
 
-            <p className="text-muted mb-0">
-              Request and track emergency assistance
+              <span className="pulse-dot"></span>
+
+              Emergency Response System
+
+            </div>
+
+            <h1>
+              Your Safety,
+              <span> Our Priority.</span>
+            </h1>
+
+            <p>
+              Request an ambulance, monitor your
+              emergency request and track your
+              ambulance in real time.
             </p>
 
           </div>
 
-          <div className="text-end">
 
-            <small className="text-muted">
-              Available Ambulances
-            </small>
+          <div className="header-ambulance-counter">
 
-            <h4 className="fw-bold text-success mb-0">
-              {drivers.length}
-            </h4>
+            <div className="counter-icon">
+
+              <LocalHospitalIcon
+                sx={{
+                  fontSize: 50,
+                  color: "#dc2626",
+                }}
+              />
+
+            </div>
+
+            <div>
+
+              <small>
+                Available Ambulances
+              </small>
+
+              <strong>
+                {drivers.length}
+              </strong>
+
+            </div>
 
           </div>
 
-        </div>
+        </section>
 
 
-        {/* ========================================= */}
-        {/* EMERGENCY CARD */}
-        {/* ========================================= */}
+        {/* ================================================= */}
+        {/* ACTIVE EMERGENCY */}
+        {/* ================================================= */}
 
-        <div
-          className="card border-0 shadow-sm mb-5 overflow-hidden"
-          style={{
-            borderRadius: "18px",
-          }}
-        >
+        {activeRequest && (
 
-          <div className="card-body p-4 p-lg-5">
+          <section className="active-emergency-card">
 
-            <div className="row align-items-center">
+            <div className="active-left">
 
-              <div className="col-lg-8">
+              <div className="active-icon">
 
-                <div
-                  className="d-inline-flex align-items-center px-3 py-2 rounded-pill mb-3"
-                  style={{
-                    background: "#fee2e2",
-                    color: "#b91c1c",
+                <EmergencyIcon
+                  sx={{
+                    fontSize: 42,
+                    color: "#dc2626",
                   }}
-                >
-
-                  <span className="fw-bold small">
-                    EMERGENCY RESPONSE
-                  </span>
-
-                </div>
-
-
-                <h2 className="fw-bold mb-2">
-                  Need an ambulance?
-                </h2>
-
-
-                <p
-                  className="text-muted mb-4"
-                  style={{
-                    maxWidth: "650px",
-                  }}
-                >
-                  Request emergency medical
-                  assistance from your current
-                  location. Our dispatch team will
-                  find and assign the nearest
-                  available ambulance.
-                </p>
-
-
-                <div className="d-flex flex-wrap gap-3">
-
-                  <button
-                    className="btn btn-danger btn-lg px-4"
-                    onClick={() =>
-                      setShowEmergencyModal(true)
-                    }
-                    disabled={requesting}
-                  >
-                    Request Ambulance
-                  </button>
-
-
-                  <div className="d-flex align-items-center text-muted">
-
-                    <span className="me-2">
-                      GPS location required
-                    </span>
-
-                  </div>
-
-                </div>
+                />
 
               </div>
 
+              <div>
 
-              {/* Emergency visual */}
+                <div className="active-label">
+                  ACTIVE EMERGENCY
+                </div>
 
-              <div className="col-lg-4 text-center mt-4 mt-lg-0">
+                <h3>
+                  {activeRequest.emergencyType}
+                </h3>
 
-                <div
-                  className="mx-auto d-flex align-items-center justify-content-center rounded-circle"
-                  style={{
-                    width: "130px",
-                    height: "130px",
-                    background: "#fff1f2",
-                    fontSize: "50px",
+                <p>
+                  Ambulance is assigned to your request.
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <div className="active-middle">
+
+              <small>
+                Status
+              </small>
+
+              <span
+                className={`status-badge ${getStatusClass(
+                  activeRequest.status
+                )}`}
+              >
+                {activeRequest.status}
+              </span>
+
+            </div>
+
+
+            <button
+              className="track-button"
+              onClick={() =>
+                setSelectedRequest(
+                  activeRequest
+                )
+              }
+            >
+
+              <LocationOnIcon
+                sx={{
+                  fontSize: 22,
+                }}
+              />
+
+              Track Ambulance
+
+            </button>
+
+          </section>
+
+        )}
+
+
+        {/* ================================================= */}
+        {/* REQUEST AMBULANCE HERO */}
+        {/* ================================================= */}
+
+        <section className="request-hero">
+
+          <div className="hero-content">
+
+            <div className="hero-badge">
+
+              <EmergencyIcon
+                sx={{
+                  fontSize: 18,
+                  verticalAlign: "middle",
+                  marginRight: "6px",
+                }}
+              />
+
+              EMERGENCY ASSISTANCE
+
+            </div>
+
+
+            <h2>
+              Need an ambulance?
+            </h2>
+
+
+            <p>
+              Get the nearest available ambulance
+              from your current GPS location.
+            </p>
+
+
+            <div className="hero-actions">
+
+              <button
+                className="request-button"
+                onClick={() =>
+                  setShowEmergencyModal(true)
+                }
+                disabled={requesting}
+              >
+
+                <LocalHospitalIcon
+                  sx={{
+                    fontSize: 30,
+                    color: "#dc2626",
                   }}
-                >
-                  🚑
+                />
+
+                <span>
+                  Request Ambulance
+                </span>
+
+              </button>
+
+
+              <div className="gps-info">
+
+                <span className="gps-icon">
+
+                  <MyLocationIcon
+                    sx={{
+                      fontSize: 24,
+                      color: "#2563eb",
+                    }}
+                  />
+
+                </span>
+
+                <div>
+
+                  <strong>
+                    GPS Location
+                  </strong>
+
+                  <small>
+                    Required for dispatch
+                  </small>
+
                 </div>
 
               </div>
@@ -371,47 +634,213 @@ console.log("Pickup Address:", pickupAddress);
 
           </div>
 
-        </div>
+
+          <div className="hero-illustration">
+
+            <div className="illustration-circle">
+
+              <LocalHospitalIcon
+                sx={{
+                  fontSize: 70,
+                  color: "#dc2626",
+                }}
+              />
+
+            </div>
+
+            <div className="orbit orbit-one"></div>
+
+            <div className="orbit orbit-two"></div>
+
+          </div>
+
+        </section>
 
 
-        {/* ========================================= */}
-        {/* AVAILABLE AMBULANCES */}
-        {/* ========================================= */}
+        {/* ================================================= */}
+        {/* STAT CARDS */}
+        {/* ================================================= */}
 
-        <div className="mb-5">
+        <section className="stats-grid">
 
-          <div className="d-flex justify-content-between align-items-center mb-3">
+          <div className="stat-card">
+
+            <div className="stat-icon blue">
+
+              <AccessTimeIcon
+                sx={{
+                  fontSize: 28,
+                  color: "#2563eb",
+                }}
+              />
+
+            </div>
 
             <div>
 
-              <h4 className="fw-bold mb-1">
-                Available Ambulances
-              </h4>
+              <small>
+                Total Requests
+              </small>
 
-              <p className="text-muted mb-0">
+              <strong>
+                {requests.length}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="stat-card">
+
+            <div className="stat-icon green">
+
+              <LocalHospitalIcon
+                sx={{
+                  fontSize: 28,
+                  color: "#16a34a",
+                }}
+              />
+
+            </div>
+
+            <div>
+
+              <small>
+                Available
+              </small>
+
+              <strong>
+                {drivers.length}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="stat-card">
+
+            <div className="stat-icon purple">
+
+              <CheckCircleIcon
+                sx={{
+                  fontSize: 28,
+                  color: "#7c3aed",
+                }}
+              />
+
+            </div>
+
+            <div>
+
+              <small>
+                Completed
+              </small>
+
+              <strong>
+                {completedRequests.length}
+              </strong>
+
+            </div>
+
+          </div>
+
+
+          <div className="stat-card">
+
+            <div className="stat-icon red">
+
+              <EmergencyIcon
+                sx={{
+                  fontSize: 28,
+                  color: "#dc2626",
+                }}
+              />
+
+            </div>
+
+            <div>
+
+              <small>
+                Emergency Support
+              </small>
+
+              <strong>
+                24/7
+              </strong>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        {/* ================================================= */}
+        {/* AVAILABLE AMBULANCES */}
+        {/* ================================================= */}
+
+        <section className="dashboard-section">
+
+          <div className="section-heading">
+
+            <div>
+
+              <div className="section-title-row">
+
+                <span className="section-title-icon">
+
+                  <LocalHospitalIcon
+                    sx={{
+                      fontSize: 30,
+                      color: "#dc2626",
+                    }}
+                  />
+
+                </span>
+
+                <h2>
+                  Available Ambulances
+                </h2>
+
+              </div>
+
+              <p>
                 Ambulances currently available
-                for dispatch
+                for emergency dispatch.
               </p>
 
             </div>
 
 
-            <span className="badge bg-success fs-6">
-              {drivers.length} Available
-            </span>
+            <button
+              className="refresh-button"
+              onClick={fetchDrivers}
+              disabled={loadingDrivers}
+            >
+
+              <RefreshIcon
+                sx={{
+                  fontSize: 20,
+                  marginRight: "6px",
+                }}
+              />
+
+              Refresh
+
+            </button>
 
           </div>
 
 
-          {/* Loading */}
-
           {loadingDrivers ? (
 
-            <div className="text-center py-5">
+            <div className="loading-container">
 
-              <div className="spinner-border text-primary" />
+              <div className="spinner"></div>
 
-              <p className="text-muted mt-2 mb-0">
+              <p>
                 Finding available ambulances...
               </p>
 
@@ -419,109 +848,94 @@ console.log("Pickup Address:", pickupAddress);
 
           ) : drivers.length === 0 ? (
 
-            /* No drivers */
+            <div className="empty-state">
 
-            <div className="card border-0 shadow-sm">
+              <div>
 
-              <div className="card-body text-center py-5">
-
-                <div
-                  style={{
-                    fontSize: "45px",
+                <LocalHospitalIcon
+                  sx={{
+                    fontSize: 55,
+                    color: "#dc2626",
                   }}
-                >
-                  🚑
-                </div>
-
-                <h5 className="fw-bold mt-3">
-                  No Ambulances Available
-                </h5>
-
-                <p className="text-muted mb-0">
-                  Please try again shortly.
-                </p>
+                />
 
               </div>
+
+              <h3>
+                No Ambulances Available
+              </h3>
+
+              <p>
+                Please try again shortly.
+              </p>
 
             </div>
 
           ) : (
 
-            /* Driver Cards */
+            <div className="ambulance-grid">
 
-            <div className="row g-4">
-
-              {drivers.map((driver) => (
-
-                <div
-                  className="col-md-6 col-lg-4"
-                  key={driver._id}
-                >
+              {drivers.map(
+                (driver) => (
 
                   <div
-                    className="card h-100 border-0 shadow-sm"
-                    style={{
-                      borderRadius: "16px",
-                    }}
+                    className="ambulance-card"
+                    key={driver._id}
                   >
 
-                    <div className="card-body p-4">
+                    <div className="ambulance-top">
 
-                      <div className="d-flex align-items-center mb-3">
+                      <div className="ambulance-avatar">
 
-                        <div
-                          className="rounded-circle d-flex align-items-center justify-content-center"
-                          style={{
-                            width: "55px",
-                            height: "55px",
-                            background: "#ecfdf5",
-                            fontSize: "27px",
+                        <LocalHospitalIcon
+                          sx={{
+                            fontSize: 35,
+                            color: "#dc2626",
                           }}
-                        >
-                          🚑
-                        </div>
-
-
-                        <div className="ms-3">
-
-                          <h5 className="fw-bold mb-1">
-                            {driver.ambulanceNumber}
-                          </h5>
-
-                          <span className="badge bg-success">
-                            Available
-                          </span>
-
-                        </div>
-
-                      </div>
-
-
-                      <hr />
-
-
-                      <div className="mb-3">
-
-                        <small className="text-muted">
-                          Driver
-                        </small>
-
-                        <div className="fw-semibold">
-                          {driver.fullName}
-                        </div>
+                        />
 
                       </div>
 
 
                       <div>
 
-                        <small className="text-muted">
+                        <h3>
+                          {driver.ambulanceNumber}
+                        </h3>
+
+                        <span className="available-badge">
+                          ● Available
+                        </span>
+
+                      </div>
+
+                    </div>
+
+
+                    <div className="ambulance-info">
+
+                      <div>
+
+                        <small>
+                          Driver
+                        </small>
+
+                        <strong>
+                          {driver.fullName}
+                        </strong>
+
+                      </div>
+
+
+                      <div>
+
+                        <small>
                           Contact
                         </small>
 
-                        <div className="fw-semibold">
+                        <strong>
                           {driver.phone}
-                        </div>
+                        </strong>
 
                       </div>
 
@@ -529,454 +943,474 @@ console.log("Pickup Address:", pickupAddress);
 
                   </div>
 
-                </div>
-
-              ))}
+                )
+              )}
 
             </div>
 
           )}
 
-        </div>
+        </section>
 
 
-        {/* ========================================= */}
-        {/* MY EMERGENCY REQUESTS */}
-        {/* ========================================= */}
+        {/* ================================================= */}
+        {/* MY REQUESTS */}
+        {/* ================================================= */}
 
-        <div>
+        <section className="dashboard-section">
 
-          <div className="mb-3">
+          <div className="section-heading">
 
-            <h4 className="fw-bold mb-1">
-              My Emergency Requests
-            </h4>
+            <div>
 
-            <p className="text-muted">
-              Track the status of your emergency
-              requests
-            </p>
+              <div className="section-title-row">
+
+                <span className="section-title-icon">
+
+                  <AccessTimeIcon
+                    sx={{
+                      fontSize: 28,
+                      color: "#2563eb",
+                    }}
+                  />
+
+                </span>
+
+                <h2>
+                  My Emergency Requests
+                </h2>
+
+              </div>
+
+              <p>
+                View the history and current status
+                of your emergency requests.
+              </p>
+
+            </div>
+
+
+            <button
+              className="refresh-button"
+              onClick={fetchRequests}
+              disabled={loadingRequests}
+            >
+
+              <RefreshIcon
+                sx={{
+                  fontSize: 20,
+                  marginRight: "6px",
+                }}
+              />
+
+              Refresh
+
+            </button>
 
           </div>
 
 
-          {/* Loading */}
-
           {loadingRequests ? (
 
-            <div className="text-center py-4">
+            <div className="loading-container">
 
-              <div className="spinner-border text-primary" />
+              <div className="spinner"></div>
+
+              <p>
+                Loading your requests...
+              </p>
 
             </div>
 
           ) : requests.length === 0 ? (
 
-            /* Empty */
+            <div className="empty-state">
 
-            <div className="card border-0 shadow-sm">
+              <div>
 
-              <div className="card-body text-center py-5">
-
-                <div
-                  style={{
-                    fontSize: "45px",
+                <AccessTimeIcon
+                  sx={{
+                    fontSize: 50,
+                    color: "#64748b",
                   }}
-                >
-                  🚑
+                />
+
+              </div>
+
+              <h3>
+                No Emergency Requests
+              </h3>
+
+              <p>
+                Your emergency requests will
+                appear here.
+              </p>
+
+            </div>
+
+          ) : (
+
+            <div className="requests-container">
+
+              {requests.map(
+                (request) => (
+
+                  <div
+                    className="request-card"
+                    key={request._id}
+                  >
+
+                    <div className="request-card-header">
+
+                      <div className="request-emergency">
+
+                        <div className="request-icon">
+
+                          <EmergencyIcon
+                            sx={{
+                              fontSize: 28,
+                              color: "#dc2626",
+                            }}
+                          />
+
+                        </div>
+
+                        <div>
+
+                          <h3>
+                            {request.emergencyType}
+                          </h3>
+
+                          <small>
+                            Request #
+                            {request._id.slice(-6)}
+                          </small>
+
+                        </div>
+
+                      </div>
+
+
+                      <span
+                        className={`status-badge ${getStatusClass(
+                          request.status
+                        )}`}
+                      >
+                        {request.status}
+                      </span>
+
+                    </div>
+
+
+                    <div className="request-details">
+
+                      <div>
+
+                        <small>
+                          Pickup Location
+                        </small>
+
+                        <strong>
+
+                          <LocationOnIcon
+                            sx={{
+                              fontSize: 18,
+                              color: "#dc2626",
+                              verticalAlign: "middle",
+                              marginRight: "4px",
+                            }}
+                          />
+
+                          {request.pickupAddress ||
+                            "Current Location"}
+
+                        </strong>
+
+                      </div>
+
+
+                      <div>
+
+                        <small>
+                          Driver
+                        </small>
+
+                        <strong>
+
+                          {request.driver ? (
+
+                            <>
+                              <PersonIcon
+                                sx={{
+                                  fontSize: 18,
+                                  verticalAlign: "middle",
+                                  marginRight: "5px",
+                                }}
+                              />
+
+                              {request.driver.fullName}
+                            </>
+
+                          ) : (
+
+                            "Waiting for assignment"
+
+                          )}
+
+                        </strong>
+
+                      </div>
+
+
+                      <div>
+
+                        <small>
+                          Ambulance
+                        </small>
+
+                        <strong>
+
+                          {request.driver ? (
+
+                            <>
+                              <DirectionsCarIcon
+                                sx={{
+                                  fontSize: 18,
+                                  verticalAlign: "middle",
+                                  marginRight: "5px",
+                                  color: "#2563eb",
+                                }}
+                              />
+
+                              {request.driver.ambulanceNumber}
+                            </>
+
+                          ) : (
+
+                            "Not Assigned"
+
+                          )}
+
+                        </strong>
+
+                      </div>
+
+                    </div>
+
+
+                    <div className="request-footer">
+
+                      <small>
+
+                        <AccessTimeIcon
+                          sx={{
+                            fontSize: 15,
+                            verticalAlign: "middle",
+                            marginRight: "4px",
+                          }}
+                        />
+
+                        {request.createdAt
+                          ? new Date(
+                              request.createdAt
+                            ).toLocaleString()
+                          : ""}
+
+                      </small>
+
+
+                      {request.driver &&
+                        request.status !==
+                          "Completed" && (
+
+                          <button
+                            className="small-track-button"
+                            onClick={() =>
+                              setSelectedRequest(
+                                request
+                              )
+                            }
+                          >
+
+                            <LocationOnIcon
+                              sx={{
+                                fontSize: 19,
+                                marginRight: "5px",
+                              }}
+                            />
+
+                            Track Ambulance
+
+                          </button>
+
+                        )}
+
+                    </div>
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
+          )}
+
+        </section>
+
+      </main>
+
+
+      {/* ================================================= */}
+      {/* TRACKING MODAL */}
+      {/* ================================================= */}
+
+      {selectedRequest && (
+
+        <div className="tracking-overlay">
+
+          <div className="tracking-modal">
+
+            <div className="tracking-header">
+
+              <div>
+
+                <span>
+                  LIVE TRACKING
+                </span>
+
+                <h2>
+                  Ambulance Tracking
+                </h2>
+
+              </div>
+
+
+              <button
+                onClick={() =>
+                  setSelectedRequest(null)
+                }
+              >
+
+                <CloseIcon
+                  sx={{
+                    fontSize: 24,
+                  }}
+                />
+
+              </button>
+
+            </div>
+
+
+            <div className="tracking-map-placeholder">
+
+              <div className="map-grid"></div>
+
+
+              {/* PATIENT MARKER */}
+
+              <div className="patient-map-marker">
+
+                <MyLocationIcon
+                  sx={{
+                    fontSize: 35,
+                    color: "#2563eb",
+                  }}
+                />
+
+              </div>
+
+
+              {/* AMBULANCE MARKER */}
+
+              <div className="ambulance-map-marker">
+
+                <LocalHospitalIcon
+                  sx={{
+                    fontSize: 45,
+                    color: "#dc2626",
+                  }}
+                />
+
+              </div>
+
+
+              <div className="map-route"></div>
+
+
+              <div className="map-coming-soon">
+
+                <div>
+
+                  <NavigationIcon
+                    sx={{
+                      fontSize: 45,
+                      color: "#2563eb",
+                    }}
+                  />
+
                 </div>
 
-                <h5 className="fw-bold mt-3">
-                  No Emergency Requests
-                </h5>
+                <h3>
+                  Live Map Tracking
+                </h3>
 
-                <p className="text-muted mb-0">
-                  Your emergency requests will
-                  appear here.
+                <p>
+                  Your ambulance will appear
+                  here in real time.
                 </p>
 
               </div>
 
             </div>
 
-          ) : (
 
-            /* Requests Table */
+            <div className="tracking-info">
 
-            <div
-              className="card border-0 shadow-sm"
-              style={{
-                borderRadius: "16px",
-              }}
-            >
+              <div>
 
-              <div className="card-body p-0">
+                <small>
+                  Ambulance
+                </small>
 
-                <div className="table-responsive">
-
-                  <table className="table table-hover align-middle mb-0">
-
-                    <thead className="table-dark">
-
-                      <tr>
-
-                        <th className="px-3">
-                          Emergency
-                        </th>
-
-                        <th>
-                          Pickup Location
-                        </th>
-
-                        <th>
-                          Status
-                        </th>
-
-                        <th>
-                          Driver
-                        </th>
-
-                        <th>
-                          Ambulance
-                        </th>
-
-                      </tr>
-
-                    </thead>
-
-
-                    <tbody>
-
-                      {requests.map((request) => (
-
-                        <tr key={request._id}>
-
-                          <td className="px-3 fw-semibold">
-
-                            {request.emergencyType}
-
-                          </td>
-
-
-                          <td>
-
-                            <div
-                              style={{
-                                maxWidth: "300px",
-                              }}
-                            >
-                              {request.pickupAddress}
-                            </div>
-
-                          </td>
-
-
-                          <td>
-
-                            <span
-                              className={`badge ${getStatusClass(
-                                request.status
-                              )}`}
-                            >
-                              {request.status}
-                            </span>
-
-                          </td>
-
-
-                          <td>
-
-                            {request.driver ? (
-
-                              <div>
-
-                                <div className="fw-semibold">
-                                  {request.driver.fullName}
-                                </div>
-
-                                <small className="text-muted">
-                                  {request.driver.phone}
-                                </small>
-
-                              </div>
-
-                            ) : (
-
-                              <span className="text-muted">
-                                Waiting for assignment
-                              </span>
-
-                            )}
-
-                          </td>
-
-
-                          <td>
-
-                            {request.driver
-                              ? request.driver
-                                  .ambulanceNumber
-                              : "Not Assigned"}
-
-                          </td>
-
-                        </tr>
-
-                      ))}
-
-                    </tbody>
-
-                  </table>
-
-                </div>
+                <strong>
+                  {selectedRequest.driver
+                    ?.ambulanceNumber ||
+                    "Not Assigned"}
+                </strong>
 
               </div>
 
-            </div>
 
-          )}
+              <div>
 
-        </div>
+                <small>
+                  Driver
+                </small>
 
-      </div>
-
-
-      {/* ========================================= */}
-      {/* EMERGENCY MODAL */}
-      {/* ========================================= */}
-
-      {showEmergencyModal && (
-
-        <div
-          className="modal d-block"
-          style={{
-            background:
-              "rgba(15, 23, 42, 0.75)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-
-          <div className="modal-dialog modal-dialog-centered">
-
-            <div
-              className="modal-content border-0 shadow-lg"
-              style={{
-                borderRadius: "20px",
-              }}
-            >
-
-              {/* Modal Header */}
-
-              <div className="modal-header border-0 px-4 pt-4">
-
-                <div>
-
-                  <div className="d-flex align-items-center gap-2 mb-1">
-
-                    <span
-                      className="d-flex align-items-center justify-content-center rounded-circle"
-                      style={{
-                        width: "42px",
-                        height: "42px",
-                        background: "#fee2e2",
-                        color: "#dc2626",
-                        fontSize: "20px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      !
-                    </span>
-
-
-                    <h5 className="modal-title fw-bold mb-0">
-                      Emergency Assistance
-                    </h5>
-
-                  </div>
-
-
-                  <p className="text-muted small mb-0">
-                    Select the reason for requesting
-                    an ambulance
-                  </p>
-
-                </div>
-
-
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={closeModal}
-                  disabled={requesting}
-                />
+                <strong>
+                  {selectedRequest.driver
+                    ?.fullName ||
+                    "Unknown"}
+                </strong>
 
               </div>
 
 
-              {/* Modal Body */}
+              <div>
 
-              <div className="modal-body px-4">
+                <small>
+                  Status
+                </small>
 
-                {/* Location information */}
-
-                <div
-                  className="rounded-3 p-3 mb-4"
-                  style={{
-                    background: "#f8fafc",
-                    border:
-                      "1px solid #e2e8f0",
-                  }}
+                <span
+                  className={`status-badge ${getStatusClass(
+                    selectedRequest.status
+                  )}`}
                 >
-
-                  <div className="d-flex align-items-start">
-
-                    <div
-                      className="me-3 d-flex align-items-center justify-content-center rounded-circle"
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        background: "#dbeafe",
-                        color: "#2563eb",
-                        fontSize: "12px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      GPS
-                    </div>
-
-
-                    <div>
-
-                      <div className="fw-semibold">
-                        Your current location
-                      </div>
-
-                      <small className="text-muted">
-                        We'll use your GPS location
-                        to find the nearest available
-                        ambulance.
-                      </small>
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-
-                {/* Emergency type */}
-
-                <label className="form-label fw-semibold mb-3">
-                  What happened?
-                </label>
-
-
-                <div className="row g-2">
-
-                  {[
-                    "Accident",
-                    "Heart Attack",
-                    "Breathing Problem",
-                    "Serious Injury",
-                    "Pregnancy",
-                    "Stroke",
-                    "Fire / Burn",
-                    "Other",
-                  ].map((type) => {
-
-                    const selected =
-                      emergencyType === type;
-
-                    return (
-
-                      <div
-                        className="col-6"
-                        key={type}
-                      >
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEmergencyType(type)
-                          }
-                          className="w-100 text-start rounded-3 p-3"
-                          style={{
-                            background: selected
-                              ? "#fee2e2"
-                              : "#fff",
-
-                            border: `1px solid ${
-                              selected
-                                ? "#dc2626"
-                                : "#e2e8f0"
-                            }`,
-
-                            color: selected
-                              ? "#b91c1c"
-                              : "#334155",
-
-                            transition:
-                              "all 0.2s",
-                          }}
-                        >
-
-                          <div className="d-flex align-items-center justify-content-between">
-
-                            <span className="fw-semibold small">
-                              {type}
-                            </span>
-
-                            {selected && (
-
-                              <span className="fw-bold">
-                                ✓
-                              </span>
-
-                            )}
-
-                          </div>
-
-                        </button>
-
-                      </div>
-
-                    );
-                  })}
-
-                </div>
-
-              </div>
-
-
-              {/* Modal Footer */}
-
-              <div className="modal-footer border-0 px-4 pb-4">
-
-                <button
-                  type="button"
-                  className="btn btn-light px-4"
-                  onClick={closeModal}
-                  disabled={requesting}
-                >
-                  Cancel
-                </button>
-
-
-                <button
-                  type="button"
-                  className="btn btn-danger px-4"
-                  disabled={
-                    !emergencyType ||
-                    requesting
-                  }
-                  onClick={handleEmergencyRequest}
-                >
-
-                  {requesting
-                    ? "Getting Location..."
-                    : "Request Ambulance"}
-
-                </button>
+                  {selectedRequest.status}
+                </span>
 
               </div>
 
@@ -988,7 +1422,194 @@ console.log("Pickup Address:", pickupAddress);
 
       )}
 
-    </>
+
+      {/* ================================================= */}
+      {/* EMERGENCY MODAL */}
+      {/* ================================================= */}
+
+      {showEmergencyModal && (
+
+        <div className="emergency-overlay">
+
+          <div className="emergency-modal">
+
+            <div className="modal-header-custom">
+
+              <div>
+
+                <div className="modal-danger-icon">
+                  <EmergencyIcon
+                    sx={{
+                      fontSize: 25,
+                      color: "#dc2626",
+                    }}
+                  />
+                </div>
+
+                <div>
+
+                  <h2>
+                    Emergency Assistance
+                  </h2>
+
+                  <p>
+                    Select the reason for requesting
+                    an ambulance.
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              <button
+                className="modal-close"
+                onClick={closeModal}
+                disabled={requesting}
+              >
+
+                <CloseIcon
+                  sx={{
+                    fontSize: 24,
+                  }}
+                />
+
+              </button>
+
+            </div>
+
+
+            {/* LOCATION */}
+
+            <div className="location-box">
+
+              <div className="location-icon">
+
+                <MyLocationIcon
+                  sx={{
+                    fontSize: 26,
+                    color: "#2563eb",
+                  }}
+                />
+
+              </div>
+
+              <div>
+
+                <strong>
+                  Your current location
+                </strong>
+
+                <p>
+                  We'll use your GPS location
+                  to find the nearest ambulance.
+                </p>
+
+              </div>
+
+            </div>
+
+
+            {/* EMERGENCY TYPE */}
+
+            <label>
+              What happened?
+            </label>
+
+
+            <div className="emergency-types">
+
+              {[
+                "Accident",
+                "Heart Attack",
+                "Breathing Problem",
+                "Serious Injury",
+                "Pregnancy",
+                "Stroke",
+                "Fire / Burn",
+                "Other",
+              ].map(
+                (type) => {
+
+                  const selected =
+                    emergencyType === type;
+
+                  return (
+
+                    <button
+                      key={type}
+                      className={
+                        selected
+                          ? "emergency-type selected"
+                          : "emergency-type"
+                      }
+                      onClick={() =>
+                        setEmergencyType(type)
+                      }
+                    >
+
+                      <span>
+                        {type}
+                      </span>
+
+                      {selected && (
+
+                        <CheckCircleIcon
+                          sx={{
+                            fontSize: 20,
+                            color: "#dc2626",
+                          }}
+                        />
+
+                      )}
+
+                    </button>
+
+                  );
+
+                }
+              )}
+
+            </div>
+
+
+            <div className="modal-footer-custom">
+
+              <button
+                className="cancel-button"
+                onClick={closeModal}
+                disabled={requesting}
+              >
+                Cancel
+              </button>
+
+
+              <button
+                className="confirm-button"
+                disabled={
+                  !emergencyType ||
+                  requesting
+                }
+                onClick={
+                  handleEmergencyRequest
+                }
+              >
+
+                {requesting
+                  ? "Getting Location..."
+                  : "Request Ambulance"}
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+    </div>
   );
 }
 

@@ -582,7 +582,7 @@ console.log("ALL REQUESTS:", response.requests);
   const newRequests =
     requests.filter(
       request =>
-        request.status === "Accepted"
+        request.status === "Accepted" 
     );
 
   const activeRequests =
