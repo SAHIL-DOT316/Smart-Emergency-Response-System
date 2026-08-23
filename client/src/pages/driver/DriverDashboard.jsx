@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState , useRef,} from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
@@ -41,7 +41,7 @@ import BedIcon from "@mui/icons-material/Bed";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 function DriverDashboard() {
-
+ const socketRef = useRef(null);
   // =========================================
   // STATE
   // =========================================
@@ -65,10 +65,17 @@ function DriverDashboard() {
 
   const [currentLongitude, setCurrentLongitude] =
     useState(null);
+    
 
   const navigate = useNavigate();
 
   const { user, logout } = useAuth();
+  useEffect(() => {
+  console.log(
+    "🚑 DRIVER USER OBJECT:",
+    JSON.stringify(user, null, 2)
+  );
+}, [user]);
    const [hospitals, setHospitals] = useState([]);
 const [hospitalLoading, setHospitalLoading] =
   useState(false);
@@ -308,99 +315,146 @@ console.log("ALL REQUESTS:", response.requests);
   };
 
 
-  // =========================================
-  // SOCKET.IO
-  // =========================================
 
-  useEffect(() => {
+// =========================================
+// SOCKET.IO
+// =========================================
 
-    if (!user?.id) {
-      return;
+useEffect(() => {
+
+  if (!user?._id) {
+    console.log("No driver user ID");
+    return;
+  }
+
+  console.log("🔌 Connecting driver socket...");
+
+  const driverId = user._id;
+
+  const newSocket = io(
+    "http://localhost:5000",
+    {
+      withCredentials: true,
+      transports: ["websocket", "polling"],
     }
+  );
 
-    const socket =
-      io("http://localhost:5000", {
-        withCredentials: true,
-      });
+  socketRef.current = newSocket;
 
-    socket.on(
-      "connect",
-      () => {
+  // =========================================
+  // CONNECT
+  // =========================================
 
-        console.log(
-          "Driver socket connected:",
-          socket.id
-        );
+  newSocket.on("connect", () => {
 
-        socket.emit(
-          "driver-online",
-          user.id
-        );
-
-      }
+    console.log(
+      " DRIVER SOCKET CONNECTED:",
+      newSocket.id
     );
 
-    socket.on(
-      "new-emergency-request",
-      async (data) => {
+    console.log(
+      " DRIVER ID:",
+      driverId
+    );
 
-        console.log(
-          " NEW EMERGENCY:",
-          data
-        );
+    newSocket.emit(
+      "driver-online",
+      driverId
+    );
 
-        if (soundEnabled) {
+  });
 
-          await playEmergencySound();
+  // =========================================
+  // CONNECTION ERROR
+  // =========================================
 
+  newSocket.on(
+    "connect_error",
+    (error) => {
+
+      console.error(
+        " SOCKET CONNECTION ERROR:",
+        error.message
+      );
+
+    }
+  );
+
+  // =========================================
+  // DISCONNECT
+  // =========================================
+
+  newSocket.on(
+    "disconnect",
+    (reason) => {
+
+      console.log(
+        " DRIVER SOCKET DISCONNECTED:",
+        reason
+      );
+
+    }
+  );
+
+  // =========================================
+  // NEW EMERGENCY
+  // =========================================
+
+  newSocket.on(
+    "new-emergency-request",
+    async (data) => {
+
+      console.log(
+        "NEW EMERGENCY:",
+        data
+      );
+
+      if (soundEnabled) {
+        await playEmergencySound();
+      }
+
+      toast.error(
+        `NEW EMERGENCY: ${
+          data?.emergencyType ||
+          "Emergency request"
+        }`,
+        {
+          autoClose: false,
         }
-
-        toast.error(
-          ` NEW EMERGENCY: ${
-            data?.emergencyType ||
-            "Emergency request"
-          }`,
-          {
-            autoClose: false,
-          }
-        );
-
-        await fetchRequests();
-
-      }
-    );
-
-    socket.on(
-      "connect_error",
-      (error) => {
-
-        console.error(
-          "Socket connection error:",
-          error
-        );
-
-      }
-    );
-
-    return () => {
-
-      socket.off("connect");
-
-      socket.off(
-        "new-emergency-request"
       );
 
-      socket.off(
-        "connect_error"
-      );
+      await fetchRequests();
 
-      socket.disconnect();
+    }
+  );
 
-    };
+  // =========================================
+  // CLEANUP
+  // =========================================
 
-  }, [user, soundEnabled]);
+  return () => {
 
+    console.log(
+      " Cleaning driver socket..."
+    );
 
+    newSocket.off("connect");
+
+    newSocket.off("connect_error");
+
+    newSocket.off("disconnect");
+
+    newSocket.off(
+      "new-emergency-request"
+    );
+
+    newSocket.disconnect();
+
+    socketRef.current = null;
+
+  };
+
+}, [user?._id, soundEnabled]);
   // =========================================
   // INITIAL REQUESTS
   // =========================================
@@ -413,119 +467,156 @@ console.log("ALL REQUESTS:", response.requests);
 
 
   // =========================================
-  // GPS LOCATION
-  // =========================================
+// GPS LOCATION
+// =========================================
 
-  useEffect(() => {
+useEffect(() => {
 
-    if (!navigator.geolocation) {
+  if (!navigator.geolocation) {
 
-      toast.error(
-        "Geolocation is not supported."
-      );
+    toast.error(
+      "Geolocation is not supported."
+    );
 
-      return;
+    return;
+  }
 
-    }
+  const updateLocation = () => {
 
-    const updateLocation = () => {
+    navigator.geolocation.getCurrentPosition(
 
-      navigator.geolocation.getCurrentPosition(
+      async (position) => {
 
-        async (position) => {
+        try {
 
-          try {
+          const latitude =
+            position.coords.latitude;
 
-            const latitude =
-              position.coords.latitude;
+          const longitude =
+            position.coords.longitude;
 
-            const longitude =
-              position.coords.longitude;
+          console.log(
+            "DRIVER GPS:",
+            latitude,
+            longitude
+          );
 
-            setCurrentLatitude(
-              latitude
+          setCurrentLatitude(latitude);
+          setCurrentLongitude(longitude);
+
+          // -----------------------------------------
+          // SAVE DRIVER LOCATION TO DATABASE
+          // -----------------------------------------
+
+          await updateDriverLocation(
+            latitude,
+            longitude
+          );
+
+          // -----------------------------------------
+          // SEND LIVE LOCATION TO SOCKET
+          // -----------------------------------------
+
+          if (socketRef.current?.connected) {
+
+            socketRef.current.emit(
+              "driver-location-update",
+              {
+               driverId: user._id,
+                latitude,
+                longitude,
+              }
             );
 
-            setCurrentLongitude(
-              longitude
-            );
-
-            await updateDriverLocation(
+            console.log(
+              "LIVE LOCATION SENT:",
               latitude,
               longitude
             );
 
-            try {
+          } else {
 
-              const address =
-                await getAddressFromCoordinates(
-                  latitude,
-                  longitude
-                );
-
-              setCurrentAddress(
-                address ||
-                "Location detected"
-              );
-
-            } catch {
-
-              setCurrentAddress(
-                "Location detected"
-              );
-
-            }
-
-          } catch (error) {
-
-            console.error(
-              "Location update error:",
-              error
+            console.log(
+              "Socket not connected"
             );
 
           }
 
-        },
+          // -----------------------------------------
+          // GET ADDRESS
+          // -----------------------------------------
 
-        (error) => {
+          try {
+
+            const address =
+              await getAddressFromCoordinates(
+                latitude,
+                longitude
+              );
+
+            setCurrentAddress(
+              address ||
+              "Location detected"
+            );
+
+          } catch {
+
+            setCurrentAddress(
+              "Location detected"
+            );
+
+          }
+
+        } catch (error) {
 
           console.error(
+            "Location update error:",
             error
           );
 
-          setCurrentAddress(
-            "Unable to detect location"
-          );
-
-        },
-
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
         }
 
-      );
+      },
 
-    };
+      (error) => {
 
-    updateLocation();
+        console.error(
+          "GPS ERROR:",
+          error
+        );
 
-    const interval =
-      setInterval(
-        updateLocation,
-        30000
-      );
+        setCurrentAddress(
+          "Unable to detect location"
+        );
 
-    return () => {
+      },
 
-      clearInterval(
-        interval
-      );
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
 
-    };
+    );
 
-  }, []);
+  };
+
+  // Get location immediately
+  updateLocation();
+
+  // Update every 5 seconds
+  const interval = setInterval(
+    updateLocation,
+    5000
+  );
+
+  return () => {
+
+    clearInterval(interval);
+
+  };
+
+}, [user]);
 
 
   // =========================================
