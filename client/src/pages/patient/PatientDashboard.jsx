@@ -2,17 +2,29 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import EmergencyIcon from "@mui/icons-material/Emergency";
 import PersonIcon from "@mui/icons-material/Person";
-import PhoneIcon from "@mui/icons-material/Phone";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import PendingIcon from "@mui/icons-material/Pending";
 import NavigationIcon from "@mui/icons-material/Navigation";
 import CloseIcon from "@mui/icons-material/Close";
+import RouteIcon from "@mui/icons-material/Route";
 
-import { useEffect, useState } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMap,
+} from "react-leaflet";
+
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+import { useEffect, useState, useRef } from "react";
+import { io } from "socket.io-client";
 import { toast } from "react-toastify";
 
 import PatientNavbar from "../../components/patient/PatientNavbar";
@@ -29,9 +41,168 @@ import {
 
 import "./patientDashboard.css";
 
+
+// =====================================================
+// LEAFLET DEFAULT ICON FIX
+// =====================================================
+
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
+
+
+// =====================================================
+// CUSTOM PATIENT ICON
+// =====================================================
+
+const patientIcon = L.divIcon({
+  className: "custom-leaflet-marker",
+
+  html: `
+    <div
+      style="
+        width:42px;
+        height:42px;
+        border-radius:50%;
+        background:#2563eb;
+        border:4px solid white;
+        box-shadow:0 4px 15px rgba(0,0,0,0.35);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        color:white;
+        font-size:22px;
+      "
+    >
+      📍
+    </div>
+  `,
+
+  iconSize: [42, 42],
+  iconAnchor: [21, 21],
+});
+
+
+// =====================================================
+// CUSTOM AMBULANCE ICON
+// =====================================================
+
+const ambulanceIcon = L.divIcon({
+  className: "custom-leaflet-marker",
+
+  html: `
+    <div
+      style="
+        width:48px;
+        height:48px;
+        border-radius:50%;
+        background:#dc2626;
+        border:4px solid white;
+        box-shadow:0 4px 18px rgba(220,38,38,0.45);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        color:white;
+        font-size:25px;
+      "
+    >
+      🚑
+    </div>
+  `,
+
+  iconSize: [48, 48],
+  iconAnchor: [24, 24],
+});
+
+
+// =====================================================
+// MAP AUTO FIT COMPONENT
+// =====================================================
+
+function MapAutoFit({
+  patientPosition,
+  driverPosition,
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+
+    if (!patientPosition && !driverPosition) {
+      return;
+    }
+
+    const points = [];
+
+    if (patientPosition) {
+      points.push(patientPosition);
+    }
+
+    if (driverPosition) {
+      points.push(driverPosition);
+    }
+
+    if (points.length === 1) {
+
+      map.setView(
+        points[0],
+        15,
+        {
+          animate: true,
+        }
+      );
+
+      return;
+    }
+
+    if (points.length === 2) {
+
+      const bounds =
+        L.latLngBounds(points);
+
+      map.fitBounds(
+        bounds,
+        {
+          padding: [60, 60],
+          maxZoom: 16,
+          animate: true,
+        }
+      );
+    }
+
+  }, [
+    map,
+    patientPosition,
+    driverPosition,
+  ]);
+
+  return null;
+}
+
+
+// =====================================================
+// MAIN COMPONENT
+// =====================================================
+
 function PatientDashboard() {
-  const [requests, setRequests] = useState([]);
-  const [drivers, setDrivers] = useState([]);
+
+  // =====================================================
+  // STATES
+  // =====================================================
+
+  const [requests, setRequests] =
+    useState([]);
+
+  const [drivers, setDrivers] =
+    useState([]);
 
   const [showEmergencyModal, setShowEmergencyModal] =
     useState(false);
@@ -52,11 +223,40 @@ function PatientDashboard() {
     useState(null);
 
   // =====================================================
+  // LIVE DRIVER LOCATION
+  // =====================================================
+
+  const socketRef =
+    useRef(null);
+
+  const [driverLocation, setDriverLocation] =
+    useState(null);
+
+  // =====================================================
+  // ROUTE
+  // =====================================================
+
+  const [routeCoordinates, setRouteCoordinates] =
+    useState([]);
+
+  const [routeLoading, setRouteLoading] =
+    useState(false);
+
+  const [routeDistance, setRouteDistance] =
+    useState(null);
+
+  const [routeDuration, setRouteDuration] =
+    useState(null);
+
+
+  // =====================================================
   // FETCH REQUESTS
   // =====================================================
 
   const fetchRequests = async () => {
+
     try {
+
       const response =
         await getMyEmergencyRequests();
 
@@ -70,6 +270,7 @@ function PatientDashboard() {
       );
 
     } catch (error) {
+
       console.error(
         "Request fetch error:",
         error
@@ -77,20 +278,25 @@ function PatientDashboard() {
 
       toast.error(
         error.response?.data?.message ||
-          "Failed to load emergency requests"
+        "Failed to load emergency requests"
       );
 
     } finally {
+
       setLoadingRequests(false);
+
     }
   };
+
 
   // =====================================================
   // FETCH AVAILABLE DRIVERS
   // =====================================================
 
   const fetchDrivers = async () => {
+
     try {
+
       const response =
         await getAvailableDrivers();
 
@@ -104,6 +310,7 @@ function PatientDashboard() {
       );
 
     } catch (error) {
+
       console.error(
         "Driver fetch error:",
         error
@@ -111,22 +318,29 @@ function PatientDashboard() {
 
       toast.error(
         error.response?.data?.message ||
-          "Failed to load ambulances"
+        "Failed to load ambulances"
       );
 
     } finally {
+
       setLoadingDrivers(false);
+
     }
   };
+
 
   // =====================================================
   // INITIAL LOAD
   // =====================================================
 
   useEffect(() => {
+
     fetchRequests();
+
     fetchDrivers();
+
   }, []);
+
 
   // =====================================================
   // CREATE EMERGENCY REQUEST
@@ -135,22 +349,30 @@ function PatientDashboard() {
   const handleEmergencyRequest = () => {
 
     if (!emergencyType) {
+
       toast.error(
         "Please select the type of emergency"
       );
+
       return;
     }
 
+
     if (!navigator.geolocation) {
+
       toast.error(
         "Geolocation is not supported by your browser."
       );
+
       return;
     }
 
+
     setRequesting(true);
 
+
     navigator.geolocation.getCurrentPosition(
+
       async (position) => {
 
         try {
@@ -161,6 +383,7 @@ function PatientDashboard() {
           const longitude =
             position.coords.longitude;
 
+
           console.log(
             "Patient Location:",
             {
@@ -169,12 +392,14 @@ function PatientDashboard() {
             }
           );
 
-          // ---------------------------------------------
+
+          // =================================================
           // GET ADDRESS
-          // ---------------------------------------------
+          // =================================================
 
           let pickupAddress =
             "Current Location";
+
 
           try {
 
@@ -185,7 +410,10 @@ function PatientDashboard() {
               );
 
             if (address) {
-              pickupAddress = address;
+
+              pickupAddress =
+                address;
+
             }
 
           } catch (addressError) {
@@ -197,14 +425,16 @@ function PatientDashboard() {
 
           }
 
+
           console.log(
             "Pickup Address:",
             pickupAddress
           );
 
-          // ---------------------------------------------
+
+          // =================================================
           // CREATE REQUEST
-          // ---------------------------------------------
+          // =================================================
 
           const response =
             await createEmergencyRequest({
@@ -219,14 +449,16 @@ function PatientDashboard() {
 
             });
 
+
           console.log(
             "Emergency Response:",
             response
           );
 
-          // ---------------------------------------------
-          // SUCCESS MESSAGE
-          // ---------------------------------------------
+
+          // =================================================
+          // SUCCESS
+          // =================================================
 
           if (response.driver) {
 
@@ -242,17 +474,20 @@ function PatientDashboard() {
 
           }
 
-          // ---------------------------------------------
+
+          // =================================================
           // RESET
-          // ---------------------------------------------
+          // =================================================
 
           setEmergencyType("");
 
           setShowEmergencyModal(false);
 
+
           await fetchRequests();
 
           await fetchDrivers();
+
 
         } catch (error) {
 
@@ -263,7 +498,7 @@ function PatientDashboard() {
 
           toast.error(
             error.response?.data?.message ||
-              "Failed to create emergency request"
+            "Failed to create emergency request"
           );
 
         } finally {
@@ -274,9 +509,15 @@ function PatientDashboard() {
 
       },
 
+
+      // ===================================================
+      // LOCATION ERROR
+      // ===================================================
+
       (error) => {
 
         setRequesting(false);
+
 
         switch (error.code) {
 
@@ -288,6 +529,7 @@ function PatientDashboard() {
 
             break;
 
+
           case error.POSITION_UNAVAILABLE:
 
             toast.error(
@@ -295,6 +537,7 @@ function PatientDashboard() {
             );
 
             break;
+
 
           case error.TIMEOUT:
 
@@ -304,21 +547,34 @@ function PatientDashboard() {
 
             break;
 
+
           default:
 
             toast.error(
               "Unable to get your current location."
             );
+
         }
+
       },
+
+
+      // ===================================================
+      // GPS OPTIONS
+      // ===================================================
 
       {
         enableHighAccuracy: true,
+
         timeout: 15000,
+
         maximumAge: 0,
       }
+
     );
+
   };
+
 
   // =====================================================
   // STATUS CLASS
@@ -351,11 +607,14 @@ function PatientDashboard() {
 
       default:
         return "status-default";
+
     }
+
   };
 
+
   // =====================================================
-  // CLOSE MODAL
+  // CLOSE EMERGENCY MODAL
   // =====================================================
 
   const closeModal = () => {
@@ -367,7 +626,9 @@ function PatientDashboard() {
     setShowEmergencyModal(false);
 
     setEmergencyType("");
+
   };
+
 
   // =====================================================
   // ACTIVE REQUEST
@@ -376,12 +637,18 @@ function PatientDashboard() {
   const activeRequest =
     requests.find(
       (request) =>
+
         request.status === "Accepted" ||
+
         request.status === "Driver Arrived" ||
+
         request.status === "Patient Picked" ||
+
         request.status === "Hospital Assigned" ||
+
         request.status === "Hospital Accepted"
     );
+
 
   // =====================================================
   // COMPLETED REQUESTS
@@ -393,16 +660,607 @@ function PatientDashboard() {
         request.status === "Completed"
     );
 
+
+  // =====================================================
+  // SOCKET.IO
+  // LIVE DRIVER LOCATION
+  // =====================================================
+
+  useEffect(() => {
+
+    console.log(
+      "🔌 Connecting patient socket..."
+    );
+
+
+    const newSocket =
+      io(
+        "http://localhost:5000",
+        {
+          withCredentials: true,
+
+          transports: [
+            "websocket",
+            "polling",
+          ],
+        }
+      );
+
+
+    socketRef.current =
+      newSocket;
+
+
+    // =================================================
+    // CONNECT
+    // =================================================
+
+    newSocket.on(
+      "connect",
+      () => {
+
+        console.log(
+          "✅ PATIENT SOCKET CONNECTED:",
+          newSocket.id
+        );
+
+      }
+    );
+
+
+    // =================================================
+    // DRIVER LOCATION
+    // =================================================
+
+    newSocket.on(
+      "driver-location-update",
+      (data) => {
+
+        console.log(
+          "🚑 LIVE DRIVER LOCATION:",
+          data
+        );
+
+
+        if (
+          !data ||
+          data.latitude == null ||
+          data.longitude == null
+        ) {
+
+          return;
+
+        }
+
+
+        // ===============================================
+        // DRIVER FILTER
+        // ===============================================
+
+        if (
+          selectedRequest?.driver?._id &&
+          data.driverId &&
+          String(
+            selectedRequest.driver._id
+          ) !==
+          String(
+            data.driverId
+          )
+        ) {
+
+          return;
+
+        }
+
+
+        setDriverLocation({
+
+          latitude:
+            Number(data.latitude),
+
+          longitude:
+            Number(data.longitude),
+
+          driverId:
+            data.driverId,
+
+          updatedAt:
+            data.updatedAt,
+
+        });
+
+      }
+    );
+
+
+    // =================================================
+    // CONNECTION ERROR
+    // =================================================
+
+    newSocket.on(
+      "connect_error",
+      (error) => {
+
+        console.error(
+          "❌ PATIENT SOCKET ERROR:",
+          error.message
+        );
+
+      }
+    );
+
+
+    // =================================================
+    // DISCONNECT
+    // =================================================
+
+    newSocket.on(
+      "disconnect",
+      (reason) => {
+
+        console.log(
+          "❌ PATIENT SOCKET DISCONNECTED:",
+          reason
+        );
+
+      }
+    );
+
+
+    // =================================================
+    // CLEANUP
+    // =================================================
+
+    return () => {
+
+      console.log(
+        "🧹 Cleaning patient socket..."
+      );
+
+
+      newSocket.off(
+        "connect"
+      );
+
+
+      newSocket.off(
+        "driver-location-update"
+      );
+
+
+      newSocket.off(
+        "connect_error"
+      );
+
+
+      newSocket.off(
+        "disconnect"
+      );
+
+
+      newSocket.disconnect();
+
+
+      socketRef.current =
+        null;
+
+    };
+
+  }, [
+    selectedRequest,
+  ]);
+
+
+  // =====================================================
+  // RESET LIVE LOCATION WHEN REQUEST CHANGES
+  // =====================================================
+
+  useEffect(() => {
+
+    setDriverLocation(null);
+
+    setRouteCoordinates([]);
+
+    setRouteDistance(null);
+
+    setRouteDuration(null);
+
+  }, [
+    selectedRequest?._id,
+  ]);
+
+
+  // =====================================================
+  // FETCH ROAD ROUTE
+  // OSRM
+  // =====================================================
+
+  const fetchRoadRoute = async () => {
+
+    if (!selectedRequest) {
+
+      return;
+
+    }
+
+
+    if (!driverLocation) {
+
+      return;
+
+    }
+
+
+    // =================================================
+    // PATIENT LOCATION
+    // =================================================
+
+    const patientLatitude =
+      Number(
+        selectedRequest.latitude
+      );
+
+    const patientLongitude =
+      Number(
+        selectedRequest.longitude
+      );
+
+
+    // =================================================
+    // DRIVER LOCATION
+    // =================================================
+
+    const driverLatitude =
+      Number(
+        driverLocation.latitude
+      );
+
+    const driverLongitude =
+      Number(
+        driverLocation.longitude
+      );
+
+
+    // =================================================
+    // VALIDATE
+    // =================================================
+
+    if (
+
+      !Number.isFinite(
+        patientLatitude
+      ) ||
+
+      !Number.isFinite(
+        patientLongitude
+      ) ||
+
+      !Number.isFinite(
+        driverLatitude
+      ) ||
+
+      !Number.isFinite(
+        driverLongitude
+      )
+
+    ) {
+
+      console.log(
+        "❌ Invalid coordinates for route"
+      );
+
+      return;
+
+    }
+
+
+    try {
+
+      setRouteLoading(true);
+
+
+      console.log(
+        "🛣️ FETCHING ROAD ROUTE"
+      );
+
+
+      console.log(
+        "Patient:",
+        {
+          latitude:
+            patientLatitude,
+
+          longitude:
+            patientLongitude,
+        }
+      );
+
+
+      console.log(
+        "Driver:",
+        {
+          latitude:
+            driverLatitude,
+
+          longitude:
+            driverLongitude,
+        }
+      );
+
+
+      // =================================================
+      // OSRM ROUTING URL
+      // =================================================
+
+      const url =
+        `https://router.project-osrm.org/route/v1/driving/` +
+
+        `${driverLongitude},${driverLatitude};` +
+
+        `${patientLongitude},${patientLatitude}` +
+
+        `?overview=full&geometries=geojson`;
+
+
+      const response =
+        await fetch(url);
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          "Route API request failed"
+        );
+
+      }
+
+
+      const data =
+        await response.json();
+
+
+      // =================================================
+      // CHECK ROUTE
+      // =================================================
+
+      if (
+
+        data.code !== "Ok" ||
+
+        !data.routes ||
+
+        data.routes.length === 0
+
+      ) {
+
+        console.log(
+          "❌ No road route found"
+        );
+
+
+        setRouteCoordinates([]);
+
+        setRouteDistance(null);
+
+        setRouteDuration(null);
+
+        return;
+
+      }
+
+
+      const route =
+        data.routes[0];
+
+
+      const coordinates =
+        route.geometry.coordinates;
+
+
+      // =================================================
+      // OSRM:
+      //
+      // [longitude, latitude]
+      //
+      // LEAFLET:
+      //
+      // [latitude, longitude]
+      // =================================================
+
+      const leafletCoordinates =
+        coordinates.map(
+          ([longitude, latitude]) => [
+
+            Number(latitude),
+
+            Number(longitude),
+
+          ]
+        );
+
+
+      setRouteCoordinates(
+        leafletCoordinates
+      );
+
+
+      // =================================================
+      // DISTANCE
+      // =================================================
+
+      if (
+        route.distance != null
+      ) {
+
+        const distanceKm =
+          route.distance / 1000;
+
+
+        setRouteDistance(
+          distanceKm.toFixed(2)
+        );
+
+      }
+
+
+      // =================================================
+      // DURATION
+      // =================================================
+
+      if (
+        route.duration != null
+      ) {
+
+        const minutes =
+          Math.ceil(
+            route.duration / 60
+          );
+
+
+        setRouteDuration(
+          minutes
+        );
+
+      }
+
+
+      console.log(
+        "✅ ROAD ROUTE RECEIVED:",
+        leafletCoordinates.length,
+        "points"
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "❌ ROUTE ERROR:",
+        error
+      );
+
+
+      setRouteCoordinates([]);
+
+      setRouteDistance(null);
+
+      setRouteDuration(null);
+
+    } finally {
+
+      setRouteLoading(false);
+
+    }
+
+  };
+
+
+  // =====================================================
+  // UPDATE ROAD ROUTE WHEN DRIVER MOVES
+  // =====================================================
+
+  useEffect(() => {
+
+    if (!selectedRequest) {
+
+      return;
+
+    }
+
+
+    if (!driverLocation) {
+
+      return;
+
+    }
+
+
+    const timer =
+      setTimeout(
+        () => {
+
+          fetchRoadRoute();
+
+        },
+
+        3000
+      );
+
+
+    return () => {
+
+      clearTimeout(timer);
+
+    };
+
+  }, [
+    selectedRequest,
+    driverLocation,
+  ]);
+
+
+  // =====================================================
+  // PATIENT POSITION
+  // =====================================================
+
+  const patientPosition =
+    selectedRequest &&
+    Number.isFinite(
+      Number(
+        selectedRequest.latitude
+      )
+    ) &&
+    Number.isFinite(
+      Number(
+        selectedRequest.longitude
+      )
+    )
+      ? [
+
+          Number(
+            selectedRequest.latitude
+          ),
+
+          Number(
+            selectedRequest.longitude
+          ),
+
+        ]
+      : null;
+
+
+  // =====================================================
+  // DRIVER POSITION
+  // =====================================================
+
+  const liveDriverPosition =
+    driverLocation
+      ? [
+
+          Number(
+            driverLocation.latitude
+          ),
+
+          Number(
+            driverLocation.longitude
+          ),
+
+        ]
+      : null;
+
+
   // =====================================================
   // UI
   // =====================================================
 
   return (
+
     <div className="patient-dashboard">
 
       <PatientNavbar />
 
+
       <main className="patient-main">
+
 
         {/* ================================================= */}
         {/* HEADER */}
@@ -420,15 +1278,25 @@ function PatientDashboard() {
 
             </div>
 
+
             <h1>
+
               Your Safety,
-              <span> Our Priority.</span>
+
+              <span>
+                {" "}
+                Our Priority.
+              </span>
+
             </h1>
 
+
             <p>
+
               Request an ambulance, monitor your
               emergency request and track your
               ambulance in real time.
+
             </p>
 
           </div>
@@ -447,11 +1315,13 @@ function PatientDashboard() {
 
             </div>
 
+
             <div>
 
               <small>
                 Available Ambulances
               </small>
+
 
               <strong>
                 {drivers.length}
@@ -472,6 +1342,7 @@ function PatientDashboard() {
 
           <section className="active-emergency-card">
 
+
             <div className="active-left">
 
               <div className="active-icon">
@@ -485,15 +1356,18 @@ function PatientDashboard() {
 
               </div>
 
+
               <div>
 
                 <div className="active-label">
                   ACTIVE EMERGENCY
                 </div>
 
+
                 <h3>
                   {activeRequest.emergencyType}
                 </h3>
+
 
                 <p>
                   Ambulance is assigned to your request.
@@ -510,12 +1384,15 @@ function PatientDashboard() {
                 Status
               </small>
 
+
               <span
                 className={`status-badge ${getStatusClass(
                   activeRequest.status
                 )}`}
               >
+
                 {activeRequest.status}
+
               </span>
 
             </div>
@@ -523,11 +1400,14 @@ function PatientDashboard() {
 
             <button
               className="track-button"
-              onClick={() =>
+
+              onClick={() => {
+
                 setSelectedRequest(
                   activeRequest
-                )
-              }
+                );
+
+              }}
             >
 
               <LocationOnIcon
@@ -546,12 +1426,13 @@ function PatientDashboard() {
 
 
         {/* ================================================= */}
-        {/* REQUEST AMBULANCE HERO */}
+        {/* REQUEST HERO */}
         {/* ================================================= */}
 
         <section className="request-hero">
 
           <div className="hero-content">
+
 
             <div className="hero-badge">
 
@@ -574,18 +1455,23 @@ function PatientDashboard() {
 
 
             <p>
+
               Get the nearest available ambulance
               from your current GPS location.
+
             </p>
 
 
             <div className="hero-actions">
 
+
               <button
                 className="request-button"
+
                 onClick={() =>
                   setShowEmergencyModal(true)
                 }
+
                 disabled={requesting}
               >
 
@@ -595,6 +1481,7 @@ function PatientDashboard() {
                     color: "#dc2626",
                   }}
                 />
+
 
                 <span>
                   Request Ambulance
@@ -616,11 +1503,13 @@ function PatientDashboard() {
 
                 </span>
 
+
                 <div>
 
                   <strong>
                     GPS Location
                   </strong>
+
 
                   <small>
                     Required for dispatch
@@ -648,6 +1537,7 @@ function PatientDashboard() {
 
             </div>
 
+
             <div className="orbit orbit-one"></div>
 
             <div className="orbit orbit-two"></div>
@@ -658,10 +1548,11 @@ function PatientDashboard() {
 
 
         {/* ================================================= */}
-        {/* STAT CARDS */}
+        {/* STATS */}
         {/* ================================================= */}
 
         <section className="stats-grid">
+
 
           <div className="stat-card">
 
@@ -676,11 +1567,13 @@ function PatientDashboard() {
 
             </div>
 
+
             <div>
 
               <small>
                 Total Requests
               </small>
+
 
               <strong>
                 {requests.length}
@@ -704,11 +1597,13 @@ function PatientDashboard() {
 
             </div>
 
+
             <div>
 
               <small>
                 Available
               </small>
+
 
               <strong>
                 {drivers.length}
@@ -732,11 +1627,13 @@ function PatientDashboard() {
 
             </div>
 
+
             <div>
 
               <small>
                 Completed
               </small>
+
 
               <strong>
                 {completedRequests.length}
@@ -760,11 +1657,13 @@ function PatientDashboard() {
 
             </div>
 
+
             <div>
 
               <small>
                 Emergency Support
               </small>
+
 
               <strong>
                 24/7
@@ -773,6 +1672,7 @@ function PatientDashboard() {
             </div>
 
           </div>
+
 
         </section>
 
@@ -783,7 +1683,9 @@ function PatientDashboard() {
 
         <section className="dashboard-section">
 
+
           <div className="section-heading">
+
 
             <div>
 
@@ -800,11 +1702,13 @@ function PatientDashboard() {
 
                 </span>
 
+
                 <h2>
                   Available Ambulances
                 </h2>
 
               </div>
+
 
               <p>
                 Ambulances currently available
@@ -816,7 +1720,9 @@ function PatientDashboard() {
 
             <button
               className="refresh-button"
+
               onClick={fetchDrivers}
+
               disabled={loadingDrivers}
             >
 
@@ -840,6 +1746,7 @@ function PatientDashboard() {
 
               <div className="spinner"></div>
 
+
               <p>
                 Finding available ambulances...
               </p>
@@ -861,9 +1768,11 @@ function PatientDashboard() {
 
               </div>
 
+
               <h3>
                 No Ambulances Available
               </h3>
+
 
               <p>
                 Please try again shortly.
@@ -882,6 +1791,7 @@ function PatientDashboard() {
                     className="ambulance-card"
                     key={driver._id}
                   >
+
 
                     <div className="ambulance-top">
 
@@ -903,8 +1813,11 @@ function PatientDashboard() {
                           {driver.ambulanceNumber}
                         </h3>
 
+
                         <span className="available-badge">
+
                           ● Available
+
                         </span>
 
                       </div>
@@ -914,11 +1827,13 @@ function PatientDashboard() {
 
                     <div className="ambulance-info">
 
+
                       <div>
 
                         <small>
                           Driver
                         </small>
+
 
                         <strong>
                           {driver.fullName}
@@ -933,11 +1848,13 @@ function PatientDashboard() {
                           Contact
                         </small>
 
+
                         <strong>
                           {driver.phone}
                         </strong>
 
                       </div>
+
 
                     </div>
 
@@ -959,7 +1876,9 @@ function PatientDashboard() {
 
         <section className="dashboard-section">
 
+
           <div className="section-heading">
+
 
             <div>
 
@@ -976,11 +1895,13 @@ function PatientDashboard() {
 
                 </span>
 
+
                 <h2>
                   My Emergency Requests
                 </h2>
 
               </div>
+
 
               <p>
                 View the history and current status
@@ -992,7 +1913,9 @@ function PatientDashboard() {
 
             <button
               className="refresh-button"
+
               onClick={fetchRequests}
+
               disabled={loadingRequests}
             >
 
@@ -1016,6 +1939,7 @@ function PatientDashboard() {
 
               <div className="spinner"></div>
 
+
               <p>
                 Loading your requests...
               </p>
@@ -1025,6 +1949,7 @@ function PatientDashboard() {
           ) : requests.length === 0 ? (
 
             <div className="empty-state">
+
 
               <div>
 
@@ -1037,9 +1962,11 @@ function PatientDashboard() {
 
               </div>
 
+
               <h3>
                 No Emergency Requests
               </h3>
+
 
               <p>
                 Your emergency requests will
@@ -1052,6 +1979,7 @@ function PatientDashboard() {
 
             <div className="requests-container">
 
+
               {requests.map(
                 (request) => (
 
@@ -1060,9 +1988,12 @@ function PatientDashboard() {
                     key={request._id}
                   >
 
+
                     <div className="request-card-header">
 
+
                       <div className="request-emergency">
+
 
                         <div className="request-icon">
 
@@ -1075,15 +2006,20 @@ function PatientDashboard() {
 
                         </div>
 
+
                         <div>
 
                           <h3>
                             {request.emergencyType}
                           </h3>
 
+
                           <small>
+
                             Request #
+
                             {request._id.slice(-6)}
+
                           </small>
 
                         </div>
@@ -1096,7 +2032,9 @@ function PatientDashboard() {
                           request.status
                         )}`}
                       >
+
                         {request.status}
+
                       </span>
 
                     </div>
@@ -1104,11 +2042,13 @@ function PatientDashboard() {
 
                     <div className="request-details">
 
+
                       <div>
 
                         <small>
                           Pickup Location
                         </small>
+
 
                         <strong>
 
@@ -1120,6 +2060,7 @@ function PatientDashboard() {
                               marginRight: "4px",
                             }}
                           />
+
 
                           {request.pickupAddress ||
                             "Current Location"}
@@ -1135,11 +2076,13 @@ function PatientDashboard() {
                           Driver
                         </small>
 
+
                         <strong>
 
                           {request.driver ? (
 
                             <>
+
                               <PersonIcon
                                 sx={{
                                   fontSize: 18,
@@ -1149,6 +2092,7 @@ function PatientDashboard() {
                               />
 
                               {request.driver.fullName}
+
                             </>
 
                           ) : (
@@ -1168,11 +2112,13 @@ function PatientDashboard() {
                           Ambulance
                         </small>
 
+
                         <strong>
 
                           {request.driver ? (
 
                             <>
+
                               <DirectionsCarIcon
                                 sx={{
                                   fontSize: 18,
@@ -1183,6 +2129,7 @@ function PatientDashboard() {
                               />
 
                               {request.driver.ambulanceNumber}
+
                             </>
 
                           ) : (
@@ -1200,6 +2147,7 @@ function PatientDashboard() {
 
                     <div className="request-footer">
 
+
                       <small>
 
                         <AccessTimeIcon
@@ -1209,6 +2157,7 @@ function PatientDashboard() {
                             marginRight: "4px",
                           }}
                         />
+
 
                         {request.createdAt
                           ? new Date(
@@ -1221,15 +2170,18 @@ function PatientDashboard() {
 
                       {request.driver &&
                         request.status !==
-                          "Completed" && (
+                        "Completed" && (
 
                           <button
                             className="small-track-button"
-                            onClick={() =>
+
+                            onClick={() => {
+
                               setSelectedRequest(
                                 request
-                              )
-                            }
+                              );
+
+                            }}
                           >
 
                             <LocationOnIcon
@@ -1269,15 +2221,23 @@ function PatientDashboard() {
 
         <div className="tracking-overlay">
 
+
           <div className="tracking-modal">
 
+
+            {/* ================================================= */}
+            {/* TRACKING HEADER */}
+            {/* ================================================= */}
+
             <div className="tracking-header">
+
 
               <div>
 
                 <span>
                   LIVE TRACKING
                 </span>
+
 
                 <h2>
                   Ambulance Tracking
@@ -1287,9 +2247,19 @@ function PatientDashboard() {
 
 
               <button
-                onClick={() =>
-                  setSelectedRequest(null)
-                }
+                onClick={() => {
+
+                  setSelectedRequest(null);
+
+                  setDriverLocation(null);
+
+                  setRouteCoordinates([]);
+
+                  setRouteDistance(null);
+
+                  setRouteDuration(null);
+
+                }}
               >
 
                 <CloseIcon
@@ -1303,70 +2273,462 @@ function PatientDashboard() {
             </div>
 
 
-            <div className="tracking-map-placeholder">
+            {/* ================================================= */}
+            {/* MAP */}
+            {/* ================================================= */}
 
-              <div className="map-grid"></div>
+            <div
+              style={{
+                width: "100%",
+                height: "550px",
+                borderRadius: "18px",
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
 
 
-              {/* PATIENT MARKER */}
+              {patientPosition ? (
 
-              <div className="patient-map-marker">
+                <MapContainer
 
-                <MyLocationIcon
-                  sx={{
-                    fontSize: 35,
-                    color: "#2563eb",
+                  center={
+                    patientPosition
+                  }
+
+                  zoom={14}
+
+                  scrollWheelZoom={true}
+
+                  style={{
+                    width: "100%",
+                    height: "100%",
                   }}
-                />
 
-              </div>
-
-
-              {/* AMBULANCE MARKER */}
-
-              <div className="ambulance-map-marker">
-
-                <LocalHospitalIcon
-                  sx={{
-                    fontSize: 45,
-                    color: "#dc2626",
-                  }}
-                />
-
-              </div>
+                >
 
 
-              <div className="map-route"></div>
+                  {/* ================================================= */}
+                  {/* OPEN STREET MAP */}
+                  {/* ================================================= */}
 
+                  <TileLayer
 
-              <div className="map-coming-soon">
+                    attribution='&copy; OpenStreetMap contributors'
 
-                <div>
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 
-                  <NavigationIcon
-                    sx={{
-                      fontSize: 45,
-                      color: "#2563eb",
-                    }}
                   />
+
+
+                  {/* ================================================= */}
+                  {/* AUTO FIT MAP */}
+                  {/* ================================================= */}
+
+                  <MapAutoFit
+
+                    patientPosition={
+                      patientPosition
+                    }
+
+                    driverPosition={
+                      liveDriverPosition
+                    }
+
+                  />
+
+
+                  {/* ================================================= */}
+                  {/* PATIENT MARKER */}
+                  {/* ================================================= */}
+
+                  <Marker
+
+                    position={
+                      patientPosition
+                    }
+
+                    icon={
+                      patientIcon
+                    }
+
+                  >
+
+                    <Popup>
+
+                      <strong>
+                        Your Location
+                      </strong>
+
+                      <br />
+
+                      Patient pickup point
+
+                    </Popup>
+
+                  </Marker>
+
+
+                  {/* ================================================= */}
+                  {/* AMBULANCE MARKER */}
+                  {/* ================================================= */}
+
+                  {liveDriverPosition && (
+
+                    <Marker
+
+                      position={
+                        liveDriverPosition
+                      }
+
+                      icon={
+                        ambulanceIcon
+                      }
+
+                    >
+
+                      <Popup>
+
+                        <div>
+
+                          <strong>
+                            🚑 Ambulance
+                          </strong>
+
+                          <br />
+
+                          <span>
+
+                            {selectedRequest
+                              .driver
+                              ?.ambulanceNumber ||
+                              "Ambulance"}
+
+                          </span>
+
+                          <br />
+
+                          <span>
+
+                            Driver:{" "}
+
+                            {selectedRequest
+                              .driver
+                              ?.fullName ||
+                              "Unknown"}
+
+                          </span>
+
+                        </div>
+
+                      </Popup>
+
+                    </Marker>
+
+                  )}
+
+
+                  {/* ================================================= */}
+                  {/* REAL ROAD ROUTE */}
+                  {/* ================================================= */}
+
+                  {routeCoordinates.length > 0 && (
+
+                    <Polyline
+
+                      positions={
+                        routeCoordinates
+                      }
+
+                      pathOptions={{
+                        color: "#2563eb",
+                        weight: 7,
+                        opacity: 0.85,
+                        lineCap: "round",
+                        lineJoin: "round",
+                      }}
+
+                    />
+
+                  )}
+
+                </MapContainer>
+
+              ) : (
+
+                <div
+                  style={{
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#f1f5f9",
+                  }}
+                >
+
+                  <div
+                    style={{
+                      textAlign: "center",
+                    }}
+                  >
+
+                    <LocationOnIcon
+                      sx={{
+                        fontSize: 55,
+                        color: "#dc2626",
+                      }}
+                    />
+
+
+                    <h3>
+                      Patient location unavailable
+                    </h3>
+
+
+                    <p>
+                      GPS coordinates were not found
+                      for this emergency request.
+                    </p>
+
+                  </div>
 
                 </div>
 
-                <h3>
-                  Live Map Tracking
-                </h3>
+              )}
 
-                <p>
-                  Your ambulance will appear
-                  here in real time.
-                </p>
+
+              {/* ================================================= */}
+              {/* ROUTE LOADING */}
+              {/* ================================================= */}
+
+              {routeLoading && (
+
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "15px",
+                    left: "50%",
+                    transform:
+                      "translateX(-50%)",
+                    background:
+                      "white",
+                    padding:
+                      "10px 18px",
+                    borderRadius:
+                      "25px",
+                    boxShadow:
+                      "0 4px 15px rgba(0,0,0,0.18)",
+                    zIndex: 1000,
+                    display: "flex",
+                    alignItems:
+                      "center",
+                    gap: "8px",
+                    fontWeight: 600,
+                  }}
+                >
+
+                  <RouteIcon
+                    sx={{
+                      color: "#2563eb",
+                      fontSize: 20,
+                    }}
+                  />
+
+                  Finding road route...
+
+                </div>
+
+              )}
+
+            </div>
+
+
+            {/* ================================================= */}
+            {/* LIVE STATUS */}
+            {/* ================================================= */}
+
+            <div
+              style={{
+                marginTop: "15px",
+                padding: "16px 20px",
+                background: "#f8fafc",
+                borderRadius: "14px",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+              }}
+            >
+
+
+              <span
+                style={{
+                  width: "11px",
+                  height: "11px",
+                  borderRadius: "50%",
+                  background:
+                    liveDriverPosition
+                      ? "#16a34a"
+                      : "#f59e0b",
+                  display: "inline-block",
+                  boxShadow:
+                    liveDriverPosition
+                      ? "0 0 0 5px rgba(22,163,74,0.12)"
+                      : "0 0 0 5px rgba(245,158,11,0.12)",
+                }}
+              ></span>
+
+
+              <div>
+
+                <strong>
+
+                  {liveDriverPosition
+                    ? "Ambulance is live"
+                    : "Waiting for ambulance location..."}
+
+                </strong>
+
+
+                {liveDriverPosition &&
+                  driverLocation?.updatedAt && (
+
+                    <span
+                      style={{
+                        marginLeft: "10px",
+                        color: "#64748b",
+                      }}
+                    >
+
+                      Updated{" "}
+
+                      {new Date(
+                        driverLocation.updatedAt
+                      ).toLocaleTimeString()}
+
+                    </span>
+
+                  )}
 
               </div>
 
             </div>
 
 
+            {/* ================================================= */}
+            {/* ROUTE INFORMATION */}
+            {/* ================================================= */}
+
+            {liveDriverPosition && (
+
+              <div
+                style={{
+                  marginTop: "12px",
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(2, minmax(0, 1fr))",
+                  gap: "12px",
+                }}
+              >
+
+
+                <div
+                  style={{
+                    background: "#eff6ff",
+                    borderRadius: "14px",
+                    padding: "15px",
+                  }}
+                >
+
+                  <small
+                    style={{
+                      display: "block",
+                      color: "#64748b",
+                      marginBottom: "5px",
+                    }}
+                  >
+
+                    <RouteIcon
+                      sx={{
+                        fontSize: 17,
+                        verticalAlign:
+                          "middle",
+                        marginRight:
+                          "4px",
+                      }}
+                    />
+
+                    Road Distance
+
+                  </small>
+
+
+                  <strong>
+
+                    {routeDistance
+                      ? `${routeDistance} km`
+                      : routeLoading
+                        ? "Calculating..."
+                        : "—"}
+
+                  </strong>
+
+                </div>
+
+
+                <div
+                  style={{
+                    background: "#f0fdf4",
+                    borderRadius: "14px",
+                    padding: "15px",
+                  }}
+                >
+
+                  <small
+                    style={{
+                      display: "block",
+                      color: "#64748b",
+                      marginBottom: "5px",
+                    }}
+                  >
+
+                    <AccessTimeIcon
+                      sx={{
+                        fontSize: 17,
+                        verticalAlign:
+                          "middle",
+                        marginRight:
+                          "4px",
+                      }}
+                    />
+
+                    Estimated Time
+
+                  </small>
+
+
+                  <strong>
+
+                    {routeDuration
+                      ? `${routeDuration} min`
+                      : routeLoading
+                        ? "Calculating..."
+                        : "—"}
+
+                  </strong>
+
+                </div>
+
+              </div>
+
+            )}
+
+
+            {/* ================================================= */}
+            {/* TRACKING INFO */}
+            {/* ================================================= */}
+
             <div className="tracking-info">
+
 
               <div>
 
@@ -1374,10 +2736,14 @@ function PatientDashboard() {
                   Ambulance
                 </small>
 
+
                 <strong>
-                  {selectedRequest.driver
+
+                  {selectedRequest
+                    .driver
                     ?.ambulanceNumber ||
                     "Not Assigned"}
+
                 </strong>
 
               </div>
@@ -1389,10 +2755,14 @@ function PatientDashboard() {
                   Driver
                 </small>
 
+
                 <strong>
-                  {selectedRequest.driver
+
+                  {selectedRequest
+                    .driver
                     ?.fullName ||
                     "Unknown"}
+
                 </strong>
 
               </div>
@@ -1404,17 +2774,21 @@ function PatientDashboard() {
                   Status
                 </small>
 
+
                 <span
                   className={`status-badge ${getStatusClass(
                     selectedRequest.status
                   )}`}
                 >
+
                   {selectedRequest.status}
+
                 </span>
 
               </div>
 
             </div>
+
 
           </div>
 
@@ -1431,20 +2805,30 @@ function PatientDashboard() {
 
         <div className="emergency-overlay">
 
+
           <div className="emergency-modal">
 
+
+            {/* ================================================= */}
+            {/* MODAL HEADER */}
+            {/* ================================================= */}
+
             <div className="modal-header-custom">
+
 
               <div>
 
                 <div className="modal-danger-icon">
+
                   <EmergencyIcon
                     sx={{
                       fontSize: 25,
                       color: "#dc2626",
                     }}
                   />
+
                 </div>
+
 
                 <div>
 
@@ -1452,9 +2836,12 @@ function PatientDashboard() {
                     Emergency Assistance
                   </h2>
 
+
                   <p>
+
                     Select the reason for requesting
                     an ambulance.
+
                   </p>
 
                 </div>
@@ -1464,7 +2851,9 @@ function PatientDashboard() {
 
               <button
                 className="modal-close"
+
                 onClick={closeModal}
+
                 disabled={requesting}
               >
 
@@ -1479,9 +2868,12 @@ function PatientDashboard() {
             </div>
 
 
+            {/* ================================================= */}
             {/* LOCATION */}
+            {/* ================================================= */}
 
             <div className="location-box">
+
 
               <div className="location-icon">
 
@@ -1494,15 +2886,19 @@ function PatientDashboard() {
 
               </div>
 
+
               <div>
 
                 <strong>
                   Your current location
                 </strong>
 
+
                 <p>
+
                   We'll use your GPS location
                   to find the nearest ambulance.
+
                 </p>
 
               </div>
@@ -1510,7 +2906,9 @@ function PatientDashboard() {
             </div>
 
 
+            {/* ================================================= */}
             {/* EMERGENCY TYPE */}
+            {/* ================================================= */}
 
             <label>
               What happened?
@@ -1518,6 +2916,7 @@ function PatientDashboard() {
 
 
             <div className="emergency-types">
+
 
               {[
                 "Accident",
@@ -1534,23 +2933,31 @@ function PatientDashboard() {
                   const selected =
                     emergencyType === type;
 
+
                   return (
 
                     <button
+
                       key={type}
+
                       className={
                         selected
                           ? "emergency-type selected"
                           : "emergency-type"
                       }
+
                       onClick={() =>
-                        setEmergencyType(type)
+                        setEmergencyType(
+                          type
+                        )
                       }
+
                     >
 
                       <span>
                         {type}
                       </span>
+
 
                       {selected && (
 
@@ -1573,26 +2980,41 @@ function PatientDashboard() {
             </div>
 
 
+            {/* ================================================= */}
+            {/* MODAL FOOTER */}
+            {/* ================================================= */}
+
             <div className="modal-footer-custom">
 
+
               <button
+
                 className="cancel-button"
+
                 onClick={closeModal}
+
                 disabled={requesting}
+
               >
+
                 Cancel
+
               </button>
 
 
               <button
+
                 className="confirm-button"
+
                 disabled={
                   !emergencyType ||
                   requesting
                 }
+
                 onClick={
                   handleEmergencyRequest
                 }
+
               >
 
                 {requesting
@@ -1600,6 +3022,7 @@ function PatientDashboard() {
                   : "Request Ambulance"}
 
               </button>
+
 
             </div>
 
@@ -1610,7 +3033,9 @@ function PatientDashboard() {
       )}
 
     </div>
+
   );
+
 }
 
 export default PatientDashboard;
