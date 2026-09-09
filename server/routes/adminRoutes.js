@@ -15,6 +15,12 @@ import {
   updateHospital,
   deleteHospital,
 } from "../controllers/adminController.js";
+import{
+   updateAdminProfile,
+  changeAdminPassword,
+} from "../controllers/adminController.js";
+
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -32,4 +38,9 @@ router.get("/hospitals/:id", getHospitalById);
 router.put("/hospitals/:id", updateHospital);
 router.delete("/hospitals/:id", deleteHospital);
 
+
+// Admin Profile
+router.put("/profile", authMiddleware, updateAdminProfile);
+
+router.put("/change-password", authMiddleware, changeAdminPassword);
 export default router;
