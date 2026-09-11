@@ -2,8 +2,8 @@ import Driver from "../models/Driver.js";
 import Hospital from "../models/Hospital.js";
 import Admin from "../models/Admin.js";
 import bcrypt from "bcryptjs";
-
-
+import Patient from "../models/Patient.js";
+import EmergencyRequest from "../models/EmergencyRequest.js";
 export const addDriver = async (req, res) => {
   try {
     const {
@@ -504,6 +504,71 @@ export const changeAdminPassword = async (req, res) => {
       message: "Password changed successfully",
     });
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+
+export const getDashboardStats = async (req, res) => {
+  try {
+    const totalDrivers = await Driver.countDocuments();
+
+    const totalHospitals = await Hospital.countDocuments();
+
+    const totalPatients = await Patient.countDocuments();
+
+    const totalAmbulances = await Driver.countDocuments({
+      ambulanceNumber: { $exists: true, $ne: "" },
+    });
+
+    const totalEmergencies = await EmergencyRequest.countDocuments();
+
+    const pendingEmergencies = await EmergencyRequest.countDocuments({
+      status: "Pending",
+    });
+
+    const activeEmergencies = await EmergencyRequest.countDocuments({
+      status: {
+        $in: [
+          "Accepted",
+          "Driver Arrived",
+          "Patient Picked",
+          "Hospital Assigned",
+          "Hospital Accepted",
+        ],
+      },
+    });
+
+    const completedEmergencies = await EmergencyRequest.countDocuments({
+      status: "Completed",
+    });
+
+    const cancelledEmergencies = await EmergencyRequest.countDocuments({
+      status: "Cancelled",
+    });
+
+    res.status(200).json({
+      success: true,
+
+      stats: {
+        drivers: totalDrivers,
+        hospitals: totalHospitals,
+        patients: totalPatients,
+        ambulances: totalAmbulances,
+        emergencies: totalEmergencies,
+        pendingEmergencies: pendingEmergencies,
+        activeEmergencies: activeEmergencies,
+        completedEmergencies: completedEmergencies,
+        cancelledEmergencies: cancelledEmergencies,
+      },
+    });
+  } catch (error) {
+    console.error("Dashboard Stats Error:", error);
+
     res.status(500).json({
       success: false,
       message: error.message,

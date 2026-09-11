@@ -18,6 +18,7 @@ import {
 import{
    updateAdminProfile,
   changeAdminPassword,
+  getDashboardStats,
 } from "../controllers/adminController.js";
 
 import authMiddleware from "../middleware/authMiddleware.js";
@@ -43,4 +44,6 @@ router.delete("/hospitals/:id", deleteHospital);
 router.put("/profile", authMiddleware, updateAdminProfile);
 
 router.put("/change-password", authMiddleware, changeAdminPassword);
+
+router.get("/dashboard", authMiddleware, getDashboardStats);
 export default router;
