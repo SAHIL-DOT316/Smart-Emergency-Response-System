@@ -18,7 +18,8 @@ import Drivers from "../pages/admin/Drivers";
 import Hospitals from "../pages/admin/Hospitals";
 import EmergencyRequests from "../pages/admin/EmergencyRequests";
 import Profile from "../pages/admin/Profile";
-
+import MyRequests from "../pages/patient/MyRequests";
+import PatientProfile from "../pages/patient/PatientProfile";
 function AppRoutes() {
   return (
     <Routes>
@@ -56,6 +57,23 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/patient/requests"
+        element={
+        <ProtectedRoute allowedRoles={["patient"]}>
+        <MyRequests />
+        </ProtectedRoute>
+      }
+     />
+
+     <Route
+        path="/patient/profile"
+        element={
+        <ProtectedRoute allowedRoles={["patient"]}>
+        <PatientProfile />
+        </ProtectedRoute>
+       }
+    />
 
 
       {/* Driver */}

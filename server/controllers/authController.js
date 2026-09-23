@@ -331,3 +331,98 @@ export const loginHospital = async (req, res) => {
     });
   }
 };
+// ==========================================
+// GET PATIENT PROFILE
+// ==========================================
+
+// GET PATIENT PROFILE
+export const getPatientProfile = async (req, res) => {
+  try {
+    const patient = await Patient.findById(req.user.id).select("-password");
+
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: "Patient not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      patient,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+// UPDATE PATIENT PROFILE
+export const updatePatientProfile = async (req, res) => {
+  try {
+    const {
+      fullName,
+      phone,
+      address,
+      emergencyContactName,
+      emergencyContactNumber,
+      profileImage,
+    } = req.body;
+
+    const patient = await Patient.findById(req.user.id);
+
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: "Patient not found",
+      });
+    }
+
+    if (fullName !== undefined) {
+      patient.fullName = fullName;
+    }
+
+    if (phone !== undefined) {
+      patient.phone = phone;
+    }
+
+    if (address !== undefined) {
+      patient.address = address;
+    }
+
+    if (emergencyContactName !== undefined) {
+      patient.emergencyContactName = emergencyContactName;
+    }
+
+    if (emergencyContactNumber !== undefined) {
+      patient.emergencyContactNumber =
+        emergencyContactNumber;
+    }
+
+    if (profileImage !== undefined) {
+      patient.profileImage = profileImage;
+    }
+
+    await patient.save();
+
+    const patientData = patient.toObject();
+
+    delete patientData.password;
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      patient: patientData,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

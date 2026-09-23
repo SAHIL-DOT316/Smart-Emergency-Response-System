@@ -946,7 +946,7 @@ function PatientDashboard() {
     ) {
 
       console.log(
-        "❌ Invalid coordinates for route"
+        " Invalid coordinates for route"
       );
 
       return;
@@ -1034,7 +1034,7 @@ function PatientDashboard() {
       ) {
 
         console.log(
-          "❌ No road route found"
+          "No road route found"
         );
 
 
@@ -1125,7 +1125,7 @@ function PatientDashboard() {
 
 
       console.log(
-        "✅ ROAD ROUTE RECEIVED:",
+        "ROAD ROUTE RECEIVED:",
         leafletCoordinates.length,
         "points"
       );
@@ -1134,7 +1134,7 @@ function PatientDashboard() {
     } catch (error) {
 
       console.error(
-        "❌ ROUTE ERROR:",
+        " ROUTE ERROR:",
         error
       );
 

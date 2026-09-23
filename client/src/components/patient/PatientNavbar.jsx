@@ -1,95 +1,109 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import "./patientNavbar.css";
 
 function PatientNavbar() {
   const navigate = useNavigate();
   const { logout } = useAuth();
+
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-      <div className="container">
+  const closeMenu = () => {
+    setMenuOpen(false);
+  };
 
-        {/* Logo */}
+  return (
+    <nav className="patient-navbar">
+
+      <div className="patient-navbar-container">
+
+        {/* LOGO */}
 
         <Link
           to="/patient"
-          className="navbar-brand fw-bold d-flex align-items-center"
+          className="patient-navbar-brand"
+          onClick={closeMenu}
         >
-          <span className="me-2"></span>
-          Smart Emergency
+          <div className="patient-logo-icon">
+            🚑
+          </div>
+
+          <div className="patient-brand-text">
+            <strong>Smart Emergency</strong>
+            <span>Emergency Response System</span>
+          </div>
         </Link>
 
-        {/* Mobile button */}
+
+        {/* MOBILE MENU BUTTON */}
 
         <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#patientNavbar"
-          aria-controls="patientNavbar"
-          aria-expanded="false"
+          className="patient-navbar-toggler"
+          onClick={() => setMenuOpen(!menuOpen)}
           aria-label="Toggle navigation"
         >
-          <span className="navbar-toggler-icon"></span>
+          <span></span>
+          <span></span>
+          <span></span>
         </button>
 
-        {/* Navbar links */}
+
+        {/* NAVIGATION */}
 
         <div
-          className="collapse navbar-collapse"
-          id="patientNavbar"
+          className={`patient-navbar-menu ${
+            menuOpen ? "show-menu" : ""
+          }`}
         >
 
-          <ul className="navbar-nav ms-auto align-items-lg-center">
+          <Link
+            to="/patient"
+            className="patient-nav-link"
+            onClick={closeMenu}
+          >
+            <span>🏠</span>
+            Home
+          </Link>
 
-            <li className="nav-item">
-              <Link
-                to="/patient"
-                className="nav-link"
-              >
-                Home
-              </Link>
-            </li>
 
-            <li className="nav-item">
-              <Link
-                to="/patient/requests"
-                className="nav-link"
-              >
-                My Requests
-              </Link>
-            </li>
+          <Link
+            to="/patient/requests"
+            className="patient-nav-link"
+            onClick={closeMenu}
+          >
+            <span>📋</span>
+            My Requests
+          </Link>
 
-            <li className="nav-item">
-              <Link
-                to="/patient/profile"
-                className="nav-link"
-              >
-                Profile
-              </Link>
-            </li>
 
-            <li className="nav-item ms-lg-3 mt-2 mt-lg-0">
+          <Link
+            to="/patient/profile"
+            className="patient-nav-link"
+            onClick={closeMenu}
+          >
+            <span>👤</span>
+            Profile
+          </Link>
 
-              <button
-                className="btn btn-danger btn-sm px-3"
-                onClick={handleLogout}
-              >
-                Logout
-              </button>
 
-            </li>
-
-          </ul>
+          <button
+            className="patient-logout-btn"
+            onClick={handleLogout}
+          >
+            <span>↪</span>
+            Logout
+          </button>
 
         </div>
 
       </div>
+
     </nav>
   );
 }
